@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stg-01-velero
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '4'
+spec:
+  project: platform-stg
+  sources:
+    - repoURL: https://vmware-tanzu.github.io/helm-charts
+      chart: velero
+      targetRevision: 11.3.2
+      helm:
+        releaseName: velero
+        valueFiles:
+          - $values/apps/platform/velero/base/velero.values.yaml
+          - $values/clusters/stg-01/platform/velero/values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: apps/platform/velero/overlays/stg
+  destination:
+    name: stg-01
+    namespace: velero
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

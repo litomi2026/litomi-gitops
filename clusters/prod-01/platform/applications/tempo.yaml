@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-01-tempo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '4'
+spec:
+  project: platform-prod
+  sources:
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: tempo
+      targetRevision: 1.26.1
+      helm:
+        releaseName: tempo
+        valueFiles:
+          - $values/apps/platform/tracing/base/tempo.values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: apps/platform/tracing/overlays/prod
+  destination:
+    name: prod-01
+    namespace: tracing
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

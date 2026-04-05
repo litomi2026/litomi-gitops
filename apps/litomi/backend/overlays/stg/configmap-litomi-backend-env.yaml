@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litomi-backend-env
+data:
+  POSTGRES_APPLICATION_NAME: litomi-backend-stg
+  POSTGRES_POOL_MAX: '1'

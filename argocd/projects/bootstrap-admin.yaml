@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: bootstrap-admin
+spec:
+  description: Management-cluster Argo CD bootstrap and parent application layer
+  sourceRepos:
+    - https://github.com/litomi2026/litomi-gitops.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true

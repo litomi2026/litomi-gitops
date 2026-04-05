@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-01-minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+spec:
+  project: platform-prod
+  sources:
+    - repoURL: https://operator.min.io
+      chart: tenant
+      targetRevision: 7.1.1
+      helm:
+        releaseName: tenant
+        valueFiles:
+          - $values/apps/platform/minio/base/tenant.values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: apps/platform/minio/overlays/prod
+  destination:
+    name: prod-01
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

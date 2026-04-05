@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stg-01-metrics-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+spec:
+  project: platform-stg
+  source:
+    repoURL: https://github.com/litomi2026/litomi-gitops.git
+    targetRevision: main
+    path: apps/platform/metrics-server/overlays/stg
+  destination:
+    name: stg-01
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,22 @@
+# Allow only litomi-web and litomi-backend pods to connect to Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: litomi-web
+        - podSelector:
+            matchLabels:
+              app: litomi-backend
+      ports:
+        - protocol: TCP
+          port: 6379

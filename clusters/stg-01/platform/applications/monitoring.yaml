@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stg-01-monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+spec:
+  project: platform-stg
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 81.6.0
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/apps/platform/monitoring/base/kube-prometheus-stack.values.yaml
+          - $values/clusters/stg-01/platform/monitoring/values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: apps/platform/monitoring/overlays/stg
+  destination:
+    name: stg-01
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

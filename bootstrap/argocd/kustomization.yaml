@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - namespace.yaml
+  # Keep the management cluster bootstrap single-node friendly for now.
+  # Move to `ha/install.yaml` once the dedicated management cluster is multi-node.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
+
+patches:
+  - path: patches/argocd-repo-server-copyutil.yaml

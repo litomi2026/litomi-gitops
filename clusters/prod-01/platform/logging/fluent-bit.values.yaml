@@ -1,0 +1,11 @@
+config:
+  outputs: |
+    [OUTPUT]
+        Name loki
+        Match kube.*
+        Host loki.logging.svc
+        Port 3100
+        Labels cluster=prod-01,job=fluent-bit
+        Auto_Kubernetes_Labels On
+        Line_Format json
+        Retry_Limit False

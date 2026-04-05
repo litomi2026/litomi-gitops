@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-stg
+spec:
+  description: Staging platform add-ons
+  sourceRepos:
+    - https://github.com/litomi2026/litomi-gitops.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
+    - https://fluent.github.io/helm-charts
+    - https://open-telemetry.github.io/opentelemetry-helm-charts
+    - https://helm.releases.hashicorp.com
+    - https://charts.external-secrets.io
+    - https://operator.min.io
+    - https://vmware-tanzu.github.io/helm-charts
+  destinations:
+    - name: stg-01
+      namespace: kube-system
+    - name: stg-01
+      namespace: cloudflared
+    - name: stg-01
+      namespace: gtm-server
+    - name: stg-01
+      namespace: monitoring
+    - name: stg-01
+      namespace: logging
+    - name: stg-01
+      namespace: tracing
+    - name: stg-01
+      namespace: vault
+    - name: stg-01
+      namespace: external-secrets
+    - name: stg-01
+      namespace: minio-operator
+    - name: stg-01
+      namespace: minio
+    - name: stg-01
+      namespace: velero
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: apiregistration.k8s.io
+      kind: APIService
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true
+  permitOnlyProjectScopedClusters: true

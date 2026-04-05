@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: management-argocd-config
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  project: bootstrap-admin
+  source:
+    repoURL: https://github.com/litomi2026/litomi-gitops.git
+    targetRevision: main
+    path: apps/platform/argocd-config/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
