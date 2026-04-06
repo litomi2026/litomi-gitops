@@ -5,10 +5,11 @@ namespace: argocd
 
 resources:
   - projects/bootstrap-admin.yaml
-  - projects/platform-stg.yaml
-  - projects/platform-prod.yaml
-  - projects/litomi-stg.yaml
-  - projects/litomi-prod.yaml
+  - projects/platform-mgmt.yaml
+  - projects/platform-workload.yaml
+  - projects/litomi-workload.yaml
+  - projects/public-edge.yaml
   - appsets/platform-clusters.yaml
   - appsets/litomi-clusters.yaml
-  - applications/management-argocd-config.yaml
+  - appsets/public-edge-addons.yaml
+  - applications/mgmt-01.yaml

@@ -1,5 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: litomi
+
 resources:
-  - ../../../../apps/litomi/backend/overlays/prod
+  - ../../../../apps/litomi/backend
+  - configmap-litomi-backend-env.yaml
+  - hpa-backend.yaml
+
+images:
+  - name: litomi-backend
+    newName: ghcr.io/litomi2026/litomi-backend
+    digest: sha256:b1aa550605c4d352486c6f7553ddf83df3d2849a1e6a71d563f69a25b7c836c4

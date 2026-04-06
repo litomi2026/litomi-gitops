@@ -1,0 +1,84 @@
+# MinIO 공식 Tenant Helm values (minio/tenant)
+
+tenant:
+  name: minio
+
+  image:
+    repository: quay.io/minio/minio
+    tag: RELEASE.2025-07-23T15-54-02Z
+    pullPolicy: IfNotPresent
+
+  configSecret:
+    name: minio-env-configuration
+    existingSecret: true
+
+  pools:
+    - name: pool-0
+      servers: 4
+      volumesPerServer: 1
+      size: 50Gi
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+      containerSecurityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: '1'
+          memory: 1Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: v1.min.io/tenant
+                      operator: In
+                      values:
+                        - minio
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              v1.min.io/tenant: minio
+
+  certificate:
+    requestAutoCert: false
+
+  buckets:
+    - name: litomi-mgmt-velero
+    - name: litomi-mgmt-loki-chunks
+    - name: litomi-mgmt-loki-ruler
+    - name: litomi-stg-velero
+    - name: litomi-prod-velero
+    - name: litomi-stg-loki-chunks
+    - name: litomi-stg-loki-ruler
+    - name: litomi-prod-loki-chunks
+    - name: litomi-prod-loki-ruler
+    - name: litomi-stg-tempo
+    - name: litomi-prod-tempo
+
+  metrics:
+    enabled: true
+    port: 9000
+    protocol: http
+
+  prometheusOperator: false

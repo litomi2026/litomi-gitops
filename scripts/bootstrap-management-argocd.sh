@@ -8,10 +8,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/bootstrap-management-argocd.sh [common flags]
+Usage: scripts/bootstrap-management-argocd.sh --management-inventory <path> [common flags]
 
-Bootstraps Argo CD on the management cluster, creates the bootstrap Git repo
-credential secret, and applies the root application.
+Bootstraps Argo CD HA on the management cluster, creates the temporary Git repo
+credential secret from /secure input, applies the root Application, and
+optionally registers workload clusters declared via --workload-inventory.
 EOF
   usage_common_flags
 }
@@ -21,51 +22,60 @@ if ! parse_common_args "$@"; then
   exit 0
 fi
 
-load_config_file
-require_command kubectl jq base64
+require_command kubectl jq yq base64
+[[ -n "${MANAGEMENT_INVENTORY_FILE}" ]] || die "--management-inventory is required"
 
-management_kubeconfig="${MANAGEMENT_KUBECONFIG:-${KUBECONFIG_PATH}}"
-management_context="${MANAGEMENT_CONTEXT:-${KUBE_CONTEXT}}"
+management_inventory="$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")"
+inventory_validate "${management_inventory}"
 
-if [[ -n "${management_kubeconfig}" ]]; then
-  management_kubeconfig="$(resolve_repo_path "${management_kubeconfig}")"
-  require_file "${management_kubeconfig}"
+workload_inventories=()
+for workload_inventory in "${WORKLOAD_INVENTORY_FILES[@]}"; do
+  resolved_inventory="$(resolve_repo_path "${workload_inventory}")"
+  inventory_validate "${resolved_inventory}"
+  workload_inventories+=("${resolved_inventory}")
+done
+
+management_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${management_inventory}")")"
+management_context="$(inventory_context "${management_inventory}")"
+require_file "${management_kubeconfig}"
+
+management_kubectl_args=()
+management_kubectl_args+=(--kubeconfig "${management_kubeconfig}")
+if [[ -n "${management_context}" ]]; then
+  management_kubectl_args+=(--context "${management_context}")
 fi
 
-declare -a management_kubectl_args
-setup_kubectl_args management_kubectl_args "${management_kubeconfig}" "${management_context}"
 require_kubectl_connectivity "management" "${management_kubectl_args[@]}"
 
-argocd_namespace="${ARGOCD_NAMESPACE:-argocd}"
-argocd_bootstrap_timeout="${ARGOCD_BOOTSTRAP_TIMEOUT:-300s}"
-argocd_bootstrap_kustomize="$(resolve_repo_path "${ARGOCD_BOOTSTRAP_KUSTOMIZE:-bootstrap/argocd}")"
-root_app_manifest="$(resolve_repo_path "${ROOT_APP_MANIFEST:-bootstrap/root/root.yaml}")"
-bootstrap_repo_secret_name="${BOOTSTRAP_REPO_SECRET_NAME:-github-repo-creds}"
-bootstrap_repo_url="${BOOTSTRAP_REPO_URL:-https://github.com/litomi2026/litomi-gitops.git}"
-bootstrap_repo_type="${BOOTSTRAP_REPO_TYPE:-git}"
-bootstrap_repo_username="${BOOTSTRAP_REPO_USERNAME:-git}"
-bootstrap_repo_token_file="$(resolve_repo_path "${BOOTSTRAP_REPO_TOKEN_FILE:-}")"
+argocd_namespace="argocd"
+bootstrap_timeout="600s"
+argocd_bootstrap_kustomize="$(resolve_repo_path "bootstrap/argocd")"
+root_app_manifest="$(resolve_repo_path "bootstrap/root/root.yaml")"
+vault_secrets_dir="$(resolve_repo_path "${VAULT_SECRETS_DIR}")"
+repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/mgmt-01/argocd/github-repo-creds.env}"
+repo_creds_file="$(resolve_repo_path "${repo_creds_file}")"
 
-[[ -n "${bootstrap_repo_token_file}" ]] || die "BOOTSTRAP_REPO_TOKEN_FILE must be set"
-require_file "${bootstrap_repo_token_file}"
 require_file "${root_app_manifest}"
+require_file "${repo_creds_file}"
 
-log "Applying Argo CD bootstrap manifests"
+bootstrap_repo_url="$(env_file_value "${repo_creds_file}" "url")"
+bootstrap_repo_type="$(env_file_value "${repo_creds_file}" "type")"
+bootstrap_repo_username="$(env_file_value "${repo_creds_file}" "username")"
+bootstrap_repo_password="$(env_file_value "${repo_creds_file}" "password")"
+
+log "Applying Argo CD HA bootstrap manifests on $(inventory_name "${management_inventory}")"
 kubectl_apply_kustomize "${argocd_bootstrap_kustomize}" "${management_kubectl_args[@]}"
 
-for deployment_name in \
+for resource_name in \
   deployment/argocd-server \
   deployment/argocd-repo-server \
   deployment/argocd-applicationset-controller \
-  statefulset/argocd-application-controller; do
-  kubectl_wait_rollout "${argocd_namespace}" "${deployment_name}" "${argocd_bootstrap_timeout}" "${management_kubectl_args[@]}"
+  statefulset/argocd-application-controller \
+  deployment/argocd-redis-ha-haproxy \
+  statefulset/argocd-redis-ha-server; do
+  kubectl_wait_rollout_if_exists "${argocd_namespace}" "${resource_name}" "${bootstrap_timeout}" "${management_kubectl_args[@]}"
 done
 
-bootstrap_repo_token="$(load_file_contents "${bootstrap_repo_token_file}")"
-bootstrap_repo_url_b64="$(printf '%s' "${bootstrap_repo_url}" | base64 | tr -d '\n')"
-bootstrap_repo_type_b64="$(printf '%s' "${bootstrap_repo_type}" | base64 | tr -d '\n')"
-bootstrap_repo_username_b64="$(printf '%s' "${bootstrap_repo_username}" | base64 | tr -d '\n')"
-bootstrap_repo_token_b64="$(printf '%s' "${bootstrap_repo_token}" | base64 | tr -d '\n')"
 tmp_manifest="$(mktemp)"
 trap 'rm -f "${tmp_manifest}"' EXIT
 
@@ -73,30 +83,61 @@ cat >"${tmp_manifest}" <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ${bootstrap_repo_secret_name}
+  name: github-repo-creds
   namespace: ${argocd_namespace}
   labels:
     argocd.argoproj.io/secret-type: repo-creds
     bootstrap.litomi.io/managed-by: bootstrap-management-argocd
 type: Opaque
-data:
-  url: ${bootstrap_repo_url_b64}
-  type: ${bootstrap_repo_type_b64}
-  username: ${bootstrap_repo_username_b64}
-  password: ${bootstrap_repo_token_b64}
+stringData:
+  url: ${bootstrap_repo_url}
+  type: ${bootstrap_repo_type}
+  username: ${bootstrap_repo_username}
+  password: ${bootstrap_repo_password}
 EOF
 
-log "Creating or updating bootstrap repo credentials"
+log "Creating temporary bootstrap repo credentials"
 kubectl_apply_file "${tmp_manifest}" "${management_kubectl_args[@]}"
 
-log "Applying root application"
+log "Applying root Application"
 kubectl_apply_file "${root_app_manifest}" "${management_kubectl_args[@]}"
 
 wait_for_jsonpath_value \
   "root application sync status" \
   "Synced" \
-  300 \
+  600 \
   '{.status.sync.status}' \
   kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application root
 
-log "Management-cluster Argo CD bootstrap completed."
+for workload_inventory in "${workload_inventories[@]}"; do
+  cluster_name="$(inventory_name "${workload_inventory}")"
+
+  log "Registering workload cluster ${cluster_name}"
+  register_cmd=(
+    "${SCRIPT_DIR}/register-workload-cluster.sh"
+    --management-inventory "${management_inventory}"
+    --inventory "${workload_inventory}"
+  )
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    register_cmd+=(--dry-run)
+  fi
+
+  run "${register_cmd[@]}"
+
+  wait_for_jsonpath_value \
+    "platform parent application ${cluster_name}" \
+    "platform-${cluster_name}" \
+    300 \
+    '{.metadata.name}' \
+    kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application "platform-${cluster_name}"
+
+  wait_for_jsonpath_value \
+    "litomi parent application ${cluster_name}" \
+    "litomi-${cluster_name}" \
+    300 \
+    '{.metadata.name}' \
+    kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application "litomi-${cluster_name}"
+done
+
+log "Management cluster bootstrap completed."

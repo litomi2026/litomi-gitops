@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: '3'
 spec:
-  project: litomi-prod
+  project: litomi-workload
   source:
     repoURL: https://github.com/litomi2026/litomi-gitops.git
     targetRevision: main

@@ -6,21 +6,22 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: '4'
 spec:
-  project: platform-prod
+  project: platform-workload
   sources:
     - repoURL: https://vmware-tanzu.github.io/helm-charts
       chart: velero
-      targetRevision: 11.3.2
+      targetRevision: 12.0.0
       helm:
         releaseName: velero
         valueFiles:
-          - $values/apps/platform/velero/base/velero.values.yaml
+          - $values/apps/platform/velero/velero.values.yaml
+          - $values/clusters/prod-01/ops/velero/values.yaml
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
       ref: values
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
-      path: apps/platform/velero/overlays/prod
+      path: clusters/prod-01/ops/velero
   destination:
     name: prod-01
     namespace: velero

@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: public-edge-addons
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            tenant: litomi
+            role: workload
+            litomi.io/addon-public-edge: enabled
+  template:
+    metadata:
+      name: public-edge-{{name}}
+    spec:
+      project: bootstrap-admin
+      source:
+        repoURL: https://github.com/litomi2026/litomi-gitops.git
+        targetRevision: main
+        path: clusters/{{name}}/addons/public-edge
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

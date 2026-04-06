@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-01-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '6'
+spec:
+  project: platform-mgmt
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      targetRevision: 6.55.0
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/apps/platform/logging/loki.values.yaml
+          - $values/clusters/mgmt-01/ops/logging/loki.values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: clusters/mgmt-01/ops/logging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - applications/longhorn.yaml
+  - applications/metallb.yaml
+  - applications/traefik.yaml
+  - applications/external-secrets.yaml
+  - applications/vault.yaml
+  - applications/minio-operator.yaml
+  - applications/minio.yaml
+  - applications/argocd-config.yaml
+  - applications/monitoring.yaml
+  - applications/loki.yaml
+  - applications/fluent-bit.yaml
+  - applications/velero.yaml

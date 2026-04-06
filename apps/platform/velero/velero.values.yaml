@@ -1,0 +1,76 @@
+# Velero Helm chart values (vmware-tanzu/velero)
+#
+# - Storage target: central MinIO on the management cluster.
+# - Longhorn CSI snapshots are available, but filesystem backup stays enabled for
+#   app compatibility and volume data portability.
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.13.1
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+upgradeCRDs: false
+
+credentials:
+  useSecret: true
+  existingSecret: velero-cloud-credentials
+
+configuration:
+  defaultVolumesToFsBackup: true
+
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: ${VELERO_BUCKET}
+      default: true
+      accessMode: ReadWrite
+      credential:
+        name: velero-cloud-credentials
+        key: cloud
+      config:
+        region: us-east-1
+        s3ForcePathStyle: 'true'
+        s3Url: http://minio.mgmt.litomi.internal
+
+  # local-path PV는 CSI snapshot을 기본으로 지원하지 않아서, VSL 생성은 꺼두는 걸 권장해요.
+  volumeSnapshotLocation: []
+
+backupsEnabled: true
+snapshotsEnabled: true
+
+deployNodeAgent: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+      app.kubernetes.io/instance: kube-prometheus-stack
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+nodeAgent:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+schedules:
+  daily:
+    schedule: '0 3 * * *'
+    template:
+      ttl: '720h' # 30d
+      storageLocation: default

@@ -1,0 +1,38 @@
+apiVersion: gitops.litomi.io/v1alpha1
+kind: ClusterInventory
+metadata:
+  name: mgmt-01
+spec:
+  role: management
+  environment: mgmt
+  sizeProfile: control-plane-ha
+  addons:
+    publicEdge: disabled
+  network:
+    internalDomain: mgmt.litomi.internal
+    apiVip: 172.30.10.10
+    kubeVip:
+      interface: eth1
+      cidr: 32
+    metallb:
+      addresses:
+        - 172.30.10.240-172.30.10.250
+  bootstrap:
+    kubeconfig: /secure/kubeconfigs/mgmt-01.yaml
+    context: ""
+    k3sTokenFile: /secure/bootstrap/k3s/mgmt-01/server.token
+  vault:
+    authMount: k8s-mgmt-01
+  nodes:
+    - name: mgmt-01-a
+      address: 172.30.10.11
+      roles:
+        - server
+    - name: mgmt-01-b
+      address: 172.30.10.12
+      roles:
+        - server
+    - name: mgmt-01-c
+      address: 172.30.10.13
+      roles:
+        - server

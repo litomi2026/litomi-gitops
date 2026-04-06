@@ -10,18 +10,17 @@ usage() {
   cat <<'EOF'
 Usage: scripts/bootstrap-vault-auth.sh [common flags]
 
-Configures Vault Kubernetes auth and upserts the ESO policies/roles implied by
-the current litomi-gitops SecretStores.
---kubeconfig/--context refer to the workload cluster where Vault runs.
+Configures the central Vault Kubernetes auth mounts for mgmt-01, stg-01, and
+prod-01 inventories, then writes cluster-scoped ESO policies and roles that map
+to the GitOps SecretStores in this repository.
 EOF
   usage_common_flags
 }
 
 write_policy() {
   local policy_name="$1"
-  shift
-  local kv_mount="$1"
-  shift
+  local kv_mount="$2"
+  shift 2
   local key_paths=("$@")
   local policy_body=""
   local key_path
@@ -61,58 +60,45 @@ upsert_vault_role() {
     max_ttl="${max_ttl}"
 }
 
-if ! parse_common_args "$@"; then
-  usage
-  exit 0
-fi
+configure_inventory() {
+  local inventory_file="$1"
+  local cluster_name cluster_role auth_mount
+  local kubeconfig_path kube_context
+  local cluster_config_json cluster_server cluster_ca cluster_ca_pem
+  local reviewer_serviceaccount reviewer_binding reviewer_manifest reviewer_jwt
 
-load_config_file
-require_command kubectl jq vault base64
+  cluster_name="$(inventory_name "${inventory_file}")"
+  cluster_role="$(inventory_role "${inventory_file}")"
+  auth_mount="$(inventory_vault_auth_mount "${inventory_file}")"
+  kubeconfig_path="$(resolve_repo_path "$(inventory_kubeconfig "${inventory_file}")")"
+  kube_context="$(inventory_context "${inventory_file}")"
 
-workload_kubeconfig="${WORKLOAD_KUBECONFIG:-${KUBECONFIG_PATH}}"
-workload_context="${WORKLOAD_CONTEXT:-${KUBE_CONTEXT}}"
-vault_addr="${VAULT_ADDR:-}"
-vault_token_file="$(resolve_repo_path "${VAULT_TOKEN_FILE:-}")"
-vault_auth_mount="${VAULT_AUTH_MOUNT_PATH:-kubernetes}"
-vault_kv_mount="${VAULT_KV_MOUNT:-kv}"
-vault_namespace="${VAULT_K8S_NAMESPACE:-vault}"
-reviewer_serviceaccount="${VAULT_TOKEN_REVIEWER_SERVICE_ACCOUNT:-vault-token-reviewer}"
-reviewer_binding="${VAULT_TOKEN_REVIEWER_BINDING_NAME:-vault-token-reviewer}"
-role_audience="${VAULT_ROLE_AUDIENCE:-vault}"
-role_ttl="${VAULT_ROLE_TTL:-1h}"
-role_max_ttl="${VAULT_ROLE_MAX_TTL:-24h}"
+  require_file "${kubeconfig_path}"
 
-[[ -n "${workload_kubeconfig}" ]] || die "WORKLOAD_KUBECONFIG or --kubeconfig is required"
-[[ -n "${vault_addr}" ]] || die "VAULT_ADDR must be set"
-[[ -n "${vault_token_file}" ]] || die "VAULT_TOKEN_FILE must be set"
+  cluster_kubectl_args=()
+  cluster_kubectl_args+=(--kubeconfig "${kubeconfig_path}")
+  if [[ -n "${kube_context}" ]]; then
+    cluster_kubectl_args+=(--context "${kube_context}")
+  fi
 
-workload_kubeconfig="$(resolve_repo_path "${workload_kubeconfig}")"
-require_file "${workload_kubeconfig}"
-require_file "${vault_token_file}"
+  require_kubectl_connectivity "${cluster_name}" "${cluster_kubectl_args[@]}"
 
-declare -a workload_kubectl_args
-setup_kubectl_args workload_kubectl_args "${workload_kubeconfig}" "${workload_context}"
-require_kubectl_connectivity "workload" "${workload_kubectl_args[@]}"
+  cluster_config_json="$(kubectl "${cluster_kubectl_args[@]}" config view --raw --flatten --minify -o json)"
+  cluster_server="$(jq -r '.clusters[0].cluster.server' <<<"${cluster_config_json}")"
+  cluster_ca="$(jq -r '.clusters[0].cluster["certificate-authority-data"] // empty' <<<"${cluster_config_json}")"
+  [[ -n "${cluster_ca}" ]] || die "Kubeconfig for ${cluster_name} must contain certificate-authority-data"
+  cluster_ca_pem="$(printf '%s' "${cluster_ca}" | base64_decode)"
 
-export VAULT_ADDR="${vault_addr}"
-export VAULT_TOKEN
-VAULT_TOKEN="$(load_file_contents "${vault_token_file}")"
+  reviewer_serviceaccount="vault-token-reviewer"
+  reviewer_binding="vault-token-reviewer-${cluster_name}"
+  reviewer_manifest="$(mktemp)"
 
-workload_cluster_json="$(kubectl "${workload_kubectl_args[@]}" config view --raw --flatten --minify -o json)"
-cluster_server="$(jq -r '.clusters[0].cluster.server' <<<"${workload_cluster_json}")"
-cluster_ca="$(jq -r '.clusters[0].cluster["certificate-authority-data"] // empty' <<<"${workload_cluster_json}")"
-[[ -n "${cluster_ca}" ]] || die "Workload kubeconfig must contain certificate-authority-data"
-cluster_ca_pem="$(printf '%s' "${cluster_ca}" | base64 --decode)"
-
-token_reviewer_manifest="$(mktemp)"
-trap 'rm -f "${token_reviewer_manifest}"' EXIT
-
-cat >"${token_reviewer_manifest}" <<EOF
+  cat >"${reviewer_manifest}" <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ${reviewer_serviceaccount}
-  namespace: ${vault_namespace}
+  namespace: external-secrets
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -121,63 +107,127 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: ${reviewer_serviceaccount}
-    namespace: ${vault_namespace}
+    namespace: external-secrets
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: system:auth-delegator
 EOF
 
-log "Ensuring Vault token-reviewer service account exists"
-kubectl_apply_file "${token_reviewer_manifest}" "${workload_kubectl_args[@]}"
+  log "Ensuring token reviewer identity exists on ${cluster_name}"
+  kubectl_apply_file "${reviewer_manifest}" "${cluster_kubectl_args[@]}"
 
-if [[ "${DRY_RUN}" == "true" ]]; then
-  reviewer_jwt="<dry-run-token>"
-else
-  reviewer_jwt="$(kubectl "${workload_kubectl_args[@]}" -n "${vault_namespace}" create token "${reviewer_serviceaccount}")"
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    reviewer_jwt="<dry-run-token>"
+  else
+    reviewer_jwt="$(kubectl "${cluster_kubectl_args[@]}" -n external-secrets create token "${reviewer_serviceaccount}")"
+  fi
+
+  if ! vault auth list -format=json | jq -e --arg mount "${auth_mount}/" '.[$mount]' >/dev/null; then
+    log "Enabling Vault auth mount ${auth_mount}/"
+    run vault auth enable -path="${auth_mount}" kubernetes
+  fi
+
+  run vault write "auth/${auth_mount}/config" \
+    kubernetes_host="${cluster_server}" \
+    kubernetes_ca_cert="${cluster_ca_pem}" \
+    token_reviewer_jwt="${reviewer_jwt}"
+
+  if [[ "${cluster_role}" == "management" ]]; then
+    write_policy "eso-${cluster_name}-argocd" "kv" \
+      "clusters/${cluster_name}/argocd/github-repo-creds"
+    upsert_vault_role "${auth_mount}" "eso-argocd" "argocd" "eso-${cluster_name}-argocd" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-minio" "kv" \
+      "clusters/${cluster_name}/minio/minio-root"
+    upsert_vault_role "${auth_mount}" "eso-minio" "minio" "eso-${cluster_name}-minio" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-monitoring" "kv" \
+      "clusters/${cluster_name}/monitoring/grafana-admin" \
+      "clusters/${cluster_name}/monitoring/alertmanager-webhook-warning" \
+      "clusters/${cluster_name}/monitoring/alertmanager-webhook-critical"
+    upsert_vault_role "${auth_mount}" "eso-monitoring" "monitoring" "eso-${cluster_name}-monitoring" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-logging" "kv" \
+      "clusters/${cluster_name}/logging/loki-s3"
+    upsert_vault_role "${auth_mount}" "eso-logging" "logging" "eso-${cluster_name}-logging" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-velero" "kv" \
+      "clusters/${cluster_name}/velero/velero-cloud-credentials"
+    upsert_vault_role "${auth_mount}" "eso-velero" "velero" "eso-${cluster_name}-velero" "vault" "1h" "24h"
+  else
+    write_policy "eso-${cluster_name}-monitoring" "kv" \
+      "clusters/${cluster_name}/monitoring/grafana-admin" \
+      "clusters/${cluster_name}/monitoring/alertmanager-webhook-warning" \
+      "clusters/${cluster_name}/monitoring/alertmanager-webhook-critical"
+    upsert_vault_role "${auth_mount}" "eso-monitoring" "monitoring" "eso-${cluster_name}-monitoring" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-logging" "kv" \
+      "clusters/${cluster_name}/logging/loki-s3"
+    upsert_vault_role "${auth_mount}" "eso-logging" "logging" "eso-${cluster_name}-logging" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-tracing" "kv" \
+      "clusters/${cluster_name}/tracing/tempo-s3"
+    upsert_vault_role "${auth_mount}" "eso-tracing" "tracing" "eso-${cluster_name}-tracing" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-velero" "kv" \
+      "clusters/${cluster_name}/velero/velero-cloud-credentials"
+    upsert_vault_role "${auth_mount}" "eso-velero" "velero" "eso-${cluster_name}-velero" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-litomi" "kv" \
+      "clusters/${cluster_name}/litomi/litomi-backend-secret"
+    upsert_vault_role "${auth_mount}" "eso-litomi" "litomi" "eso-${cluster_name}-litomi" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-cloudflared" "kv" \
+      "clusters/${cluster_name}/cloudflared/cloudflared-token"
+    upsert_vault_role "${auth_mount}" "eso-cloudflared" "cloudflared" "eso-${cluster_name}-cloudflared" "vault" "1h" "24h"
+
+    write_policy "eso-${cluster_name}-gtm-server" "kv" \
+      "clusters/${cluster_name}/gtm-server/gtm-server-secret"
+    upsert_vault_role "${auth_mount}" "eso-gtm-server" "gtm-server" "eso-${cluster_name}-gtm-server" "vault" "1h" "24h"
+  fi
+
+  rm -f "${reviewer_manifest}"
+  log "Vault Kubernetes auth is configured for ${cluster_name}"
+}
+
+if ! parse_common_args "$@"; then
+  usage
+  exit 0
 fi
 
-if ! vault auth list -format=json | jq -e --arg mount "${vault_auth_mount}/" '.[$mount]' >/dev/null; then
-  log "Enabling Vault Kubernetes auth at ${vault_auth_mount}/"
-  run vault auth enable -path="${vault_auth_mount}" kubernetes
+require_command kubectl jq vault yq base64
+
+target_inventories=()
+if [[ -n "${MANAGEMENT_INVENTORY_FILE}" ]]; then
+  target_inventories+=("$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")")
 fi
 
-run vault write "auth/${vault_auth_mount}/config" \
-  kubernetes_host="${cluster_server}" \
-  kubernetes_ca_cert="${cluster_ca_pem}" \
-  token_reviewer_jwt="${reviewer_jwt}"
+if [[ -n "${INVENTORY_FILE}" ]]; then
+  target_inventories+=("$(resolve_repo_path "${INVENTORY_FILE}")")
+fi
 
-write_policy "eso-argocd" "${vault_kv_mount}" "argocd/github-repo-creds"
-upsert_vault_role "${vault_auth_mount}" "eso-argocd" "argocd" "eso-argocd" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+for workload_inventory in "${WORKLOAD_INVENTORY_FILES[@]}"; do
+  target_inventories+=("$(resolve_repo_path "${workload_inventory}")")
+done
 
-write_policy "eso-cloudflared" "${vault_kv_mount}" "cloudflared/cloudflared-token"
-upsert_vault_role "${vault_auth_mount}" "eso-cloudflared" "cloudflared" "eso-cloudflared" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+(( ${#target_inventories[@]} > 0 )) || die "Provide at least one inventory via --management-inventory, --inventory, or --workload-inventory"
 
-write_policy "eso-gtm-server" "${vault_kv_mount}" "gtm-server/gtm-server-secret"
-upsert_vault_role "${vault_auth_mount}" "eso-gtm-server" "gtm-server" "eso-gtm-server" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+for inventory_file in "${target_inventories[@]}"; do
+  inventory_validate "${inventory_file}"
+done
 
-write_policy "eso-monitoring" "${vault_kv_mount}" \
-  "monitoring/grafana-admin" \
-  "monitoring/alertmanager-discord-webhook-warning" \
-  "monitoring/alertmanager-discord-webhook-critical"
-upsert_vault_role "${vault_auth_mount}" "eso-monitoring" "monitoring" "eso-monitoring" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+vault_addr="${VAULT_ADDR_OVERRIDE:-https://vault.mgmt.litomi.internal}"
+vault_token_file="$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
+[[ -n "${vault_token_file}" ]] || die "--vault-token-file is required"
+require_file "${vault_token_file}"
 
-write_policy "eso-logging" "${vault_kv_mount}" "minio/minio-root"
-upsert_vault_role "${vault_auth_mount}" "eso-logging" "logging" "eso-logging" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+export VAULT_ADDR="${vault_addr}"
+export VAULT_TOKEN
+VAULT_TOKEN="$(load_file_contents "${vault_token_file}")"
 
-write_policy "eso-tracing" "${vault_kv_mount}" "minio/minio-root"
-upsert_vault_role "${vault_auth_mount}" "eso-tracing" "tracing" "eso-tracing" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
+for inventory_file in "${target_inventories[@]}"; do
+  configure_inventory "${inventory_file}"
+done
 
-write_policy "eso-minio" "${vault_kv_mount}" "minio/minio-root"
-upsert_vault_role "${vault_auth_mount}" "eso-minio" "minio" "eso-minio" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
-
-write_policy "eso-velero" "${vault_kv_mount}" "velero/velero-cloud-credentials"
-upsert_vault_role "${vault_auth_mount}" "eso-velero" "velero" "eso-velero" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
-
-write_policy "eso-litomi-stg" "${vault_kv_mount}" "litomi-stg/litomi-backend-secret"
-upsert_vault_role "${vault_auth_mount}" "eso-litomi-stg" "litomi" "eso-litomi-stg" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
-
-write_policy "eso-litomi-prod" "${vault_kv_mount}" "litomi-prod/litomi-backend-secret"
-upsert_vault_role "${vault_auth_mount}" "eso-litomi-prod" "litomi" "eso-litomi-prod" "${role_audience}" "${role_ttl}" "${role_max_ttl}"
-
-log "Vault Kubernetes auth and ESO roles are configured."
+log "All requested Vault auth mounts, policies, and ESO roles are configured."

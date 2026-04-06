@@ -4,24 +4,24 @@ metadata:
   name: stg-01-monitoring
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '3'
+    argocd.argoproj.io/sync-wave: '2'
 spec:
-  project: platform-stg
+  project: platform-workload
   sources:
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
-      targetRevision: 81.6.0
+      targetRevision: 82.18.0
       helm:
         releaseName: kube-prometheus-stack
         valueFiles:
-          - $values/apps/platform/monitoring/base/kube-prometheus-stack.values.yaml
-          - $values/clusters/stg-01/platform/monitoring/values.yaml
+          - $values/apps/platform/monitoring/kube-prometheus-stack.values.yaml
+          - $values/clusters/stg-01/ops/monitoring/values.yaml
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
       ref: values
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
-      path: apps/platform/monitoring/overlays/stg
+      path: clusters/stg-01/ops/monitoring
   destination:
     name: stg-01
     namespace: monitoring

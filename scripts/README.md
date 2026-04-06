@@ -1,26 +1,56 @@
 # Bootstrap Scripts
 
-이 디렉터리는 Ubuntu 호스트에서 `litomi-gitops`를 클론한 뒤 실행하는 운영 스크립트를 모아둔 곳이에요.
+이 디렉터리는 `mgmt-01` / `stg-01` / `prod-01` 3개 고정 inventory를 기준으로 동작해요.
+
+## 준비물
+
+- `kubectl`
+- `jq`
+- `yq`
+- `vault`
+- Git clone 된 현재 repo
+- `/secure/kubeconfigs/*.yaml`
+- `/secure/bootstrap/inventory/*.yaml`
+- `/secure/vault-secrets/clusters/**`
+
+inventory 템플릿은 `bootstrap/inventory/templates/*.yaml`을 기준으로 만들고,
+secret 입력 템플릿은 `bootstrap/secrets/templates/**`를 기준으로 채워요.
 
 ## 권장 순서
 
 ```zsh
-./scripts/preflight-host.sh --config /secure/bootstrap/management.env
-./scripts/bootstrap-management-argocd.sh --config /secure/bootstrap/management.env
-./scripts/register-workload-cluster.sh --config /secure/bootstrap/clusters/stg-01.env --cluster-name stg-01 --kubeconfig /secure/kubeconfigs/stg-01.yaml
-./scripts/bootstrap-vault-auth.sh --config /secure/bootstrap/secrets.env --kubeconfig /secure/kubeconfigs/stg-01.yaml
-./scripts/seed-vault-kv.sh --config /secure/bootstrap/secrets.env --vault-secrets-dir /secure/vault-secrets
-./scripts/verify-platform.sh --config /secure/bootstrap/management.env --cluster-name stg-01
+./scripts/preflight-host.sh \
+  --management-inventory /secure/bootstrap/inventory/mgmt-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/stg-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/prod-01.yaml \
+  --vault-secrets-dir /secure/vault-secrets \
+  --vault-token-file /secure/bootstrap/vault/root-token
+
+./scripts/bootstrap-management-argocd.sh \
+  --management-inventory /secure/bootstrap/inventory/mgmt-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/stg-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/prod-01.yaml \
+  --vault-secrets-dir /secure/vault-secrets
+
+./scripts/bootstrap-vault-auth.sh \
+  --management-inventory /secure/bootstrap/inventory/mgmt-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/stg-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/prod-01.yaml \
+  --vault-token-file /secure/bootstrap/vault/root-token
+
+./scripts/seed-vault-kv.sh \
+  --vault-secrets-dir /secure/vault-secrets \
+  --vault-token-file /secure/bootstrap/vault/root-token
+
+./scripts/verify-platform.sh \
+  --management-inventory /secure/bootstrap/inventory/mgmt-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/stg-01.yaml \
+  --workload-inventory /secure/bootstrap/inventory/prod-01.yaml
 ```
-
-## 구성 파일 예시
-
-- 관리 클러스터: `bootstrap/config/management.env.example`
-- 워크로드 클러스터 등록: `bootstrap/config/clusters/cluster-name.env.example`
-- Vault auth / seed: `bootstrap/config/secrets.env.example`
 
 ## 설계 원칙
 
-- 가능한 상태는 GitOps 리소스로 두고, 최초 1회 bootstrap만 스크립트로 다뤄요.
-- 모든 스크립트는 재실행 가능하게 만들고, `--dry-run`을 지원해요.
-- 호스트 패키지 설치와 k3s 설치는 이 레포 밖에서 준비하고, 이 레포는 검증과 Kubernetes/Vault bootstrap만 맡아요.
+- host/bootstrap 레이어는 inventory YAML을 입력으로 받아 kube-vip / MetalLB / node 배치를 문서화해요.
+- GitOps 레이어는 Argo CD가 `clusters/mgmt-01`, `clusters/stg-01`, `clusters/prod-01`를 소유해요.
+- Vault seed는 `/secure/vault-secrets/clusters/<cluster>/<namespace>/<secret>.env`를 `kv/clusters/...`에 그대로 넣어요.
+- public edge addon은 cluster secret label `litomi.io/addon-public-edge=enabled`일 때만 동기화돼요.

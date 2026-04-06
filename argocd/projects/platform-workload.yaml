@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-workload
+spec:
+  description: Shared workload-cluster platform baseline
+  sourceRepos:
+    - https://github.com/litomi2026/litomi-gitops.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
+    - https://fluent.github.io/helm-charts
+    - https://open-telemetry.github.io/opentelemetry-helm-charts
+    - https://charts.external-secrets.io
+    - https://vmware-tanzu.github.io/helm-charts
+    - https://charts.longhorn.io
+    - https://metallb.github.io/metallb
+    - https://traefik.github.io/charts
+  destinations:
+    - name: stg-01
+      namespace: kube-system
+    - name: stg-01
+      namespace: external-secrets
+    - name: stg-01
+      namespace: longhorn-system
+    - name: stg-01
+      namespace: metallb-system
+    - name: stg-01
+      namespace: traefik
+    - name: stg-01
+      namespace: monitoring
+    - name: stg-01
+      namespace: logging
+    - name: stg-01
+      namespace: tracing
+    - name: stg-01
+      namespace: velero
+    - name: prod-01
+      namespace: kube-system
+    - name: prod-01
+      namespace: external-secrets
+    - name: prod-01
+      namespace: longhorn-system
+    - name: prod-01
+      namespace: metallb-system
+    - name: prod-01
+      namespace: traefik
+    - name: prod-01
+      namespace: monitoring
+    - name: prod-01
+      namespace: logging
+    - name: prod-01
+      namespace: tracing
+    - name: prod-01
+      namespace: velero
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: apiregistration.k8s.io
+      kind: APIService
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: storage.k8s.io
+      kind: StorageClass
+    - group: metallb.io
+      kind: IPAddressPool
+    - group: metallb.io
+      kind: L2Advertisement
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true
+  permitOnlyProjectScopedClusters: true

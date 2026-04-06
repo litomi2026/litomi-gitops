@@ -1,0 +1,38 @@
+apiVersion: gitops.litomi.io/v1alpha1
+kind: ClusterInventory
+metadata:
+  name: prod-01
+spec:
+  role: workload
+  environment: prod
+  sizeProfile: production-ha
+  addons:
+    publicEdge: disabled
+  network:
+    internalDomain: prod.litomi.internal
+    apiVip: 172.30.30.10
+    kubeVip:
+      interface: eth1
+      cidr: 32
+    metallb:
+      addresses:
+        - 172.30.30.240-172.30.30.250
+  bootstrap:
+    kubeconfig: /secure/kubeconfigs/prod-01.yaml
+    context: ""
+    k3sTokenFile: /secure/bootstrap/k3s/prod-01/server.token
+  vault:
+    authMount: k8s-prod-01
+  nodes:
+    - name: prod-01-a
+      address: 172.30.30.11
+      roles:
+        - server
+    - name: prod-01-b
+      address: 172.30.30.12
+      roles:
+        - server
+    - name: prod-01-c
+      address: 172.30.30.13
+      roles:
+        - server

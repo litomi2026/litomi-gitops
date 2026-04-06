@@ -1,0 +1,38 @@
+apiVersion: gitops.litomi.io/v1alpha1
+kind: ClusterInventory
+metadata:
+  name: stg-01
+spec:
+  role: workload
+  environment: stg
+  sizeProfile: small-ha
+  addons:
+    publicEdge: disabled
+  network:
+    internalDomain: stg.litomi.internal
+    apiVip: 172.30.20.10
+    kubeVip:
+      interface: eth1
+      cidr: 32
+    metallb:
+      addresses:
+        - 172.30.20.240-172.30.20.250
+  bootstrap:
+    kubeconfig: /secure/kubeconfigs/stg-01.yaml
+    context: ""
+    k3sTokenFile: /secure/bootstrap/k3s/stg-01/server.token
+  vault:
+    authMount: k8s-stg-01
+  nodes:
+    - name: stg-01-a
+      address: 172.30.20.11
+      roles:
+        - server
+    - name: stg-01-b
+      address: 172.30.20.12
+      roles:
+        - server
+    - name: stg-01-c
+      address: 172.30.20.13
+      roles:
+        - server

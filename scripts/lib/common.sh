@@ -6,11 +6,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 DRY_RUN=false
-CONFIG_FILE=""
-KUBECONFIG_PATH="${KUBECONFIG:-}"
-KUBE_CONTEXT=""
-CLUSTER_NAME=""
-VAULT_SECRETS_DIR=""
+INVENTORY_FILE=""
+MANAGEMENT_INVENTORY_FILE=""
+WORKLOAD_INVENTORY_FILES=()
+VAULT_SECRETS_DIR="/secure/vault-secrets"
+VAULT_TOKEN_FILE=""
+VAULT_ADDR_OVERRIDE=""
+REPO_CREDS_FILE=""
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -43,19 +45,6 @@ run() {
   fi
 
   "$@"
-}
-
-bool_from_env() {
-  local value="${1:-}"
-
-  case "${value,,}" in
-    1|true|yes|y|on)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
 }
 
 resolve_repo_path() {
@@ -96,46 +85,93 @@ require_dir() {
   [[ -d "${dir_path}" ]] || die "Required directory not found: ${dir_path}"
 }
 
-load_config_file() {
-  if [[ -z "${CONFIG_FILE}" ]]; then
-    return 0
+load_file_contents() {
+  local file_path="$1"
+  require_file "${file_path}"
+  <"${file_path}" tr -d '\r'
+}
+
+base64_decode() {
+  if base64 --decode </dev/null >/dev/null 2>&1; then
+    base64 --decode
+  else
+    base64 -D
   fi
+}
 
-  local resolved_config
-  resolved_config="$(resolve_repo_path "${CONFIG_FILE}")"
-  require_file "${resolved_config}"
+decode_env_value() {
+  local raw_value="$1"
+  local evaluated_value=""
 
-  # shellcheck disable=SC1090
-  set -a && . "${resolved_config}" && set +a
-  CONFIG_FILE="${resolved_config}"
+  # shellcheck disable=SC2086
+  eval "evaluated_value=${raw_value}"
+  printf '%b' "${evaluated_value}"
+}
+
+env_file_value() {
+  local env_file="$1"
+  local expected_key="$2"
+  local line key raw_value
+
+  require_file "${env_file}"
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+ ]] && line="${line#export }"
+
+    if [[ ! "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      die "Unsupported env line in ${env_file}: ${line}"
+    fi
+
+    key="${line%%=*}"
+    raw_value="${line#*=}"
+
+    if [[ "${key}" == "${expected_key}" ]]; then
+      decode_env_value "${raw_value}"
+      return 0
+    fi
+  done <"${env_file}"
+
+  die "Key '${expected_key}' not found in ${env_file}"
 }
 
 parse_common_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --config)
-        [[ $# -ge 2 ]] || die "--config requires a value"
-        CONFIG_FILE="$2"
+      --inventory)
+        [[ $# -ge 2 ]] || die "--inventory requires a value"
+        INVENTORY_FILE="$2"
         shift 2
         ;;
-      --kubeconfig)
-        [[ $# -ge 2 ]] || die "--kubeconfig requires a value"
-        KUBECONFIG_PATH="$2"
+      --management-inventory)
+        [[ $# -ge 2 ]] || die "--management-inventory requires a value"
+        MANAGEMENT_INVENTORY_FILE="$2"
         shift 2
         ;;
-      --context)
-        [[ $# -ge 2 ]] || die "--context requires a value"
-        KUBE_CONTEXT="$2"
-        shift 2
-        ;;
-      --cluster-name)
-        [[ $# -ge 2 ]] || die "--cluster-name requires a value"
-        CLUSTER_NAME="$2"
+      --workload-inventory)
+        [[ $# -ge 2 ]] || die "--workload-inventory requires a value"
+        WORKLOAD_INVENTORY_FILES+=("$2")
         shift 2
         ;;
       --vault-secrets-dir)
         [[ $# -ge 2 ]] || die "--vault-secrets-dir requires a value"
         VAULT_SECRETS_DIR="$2"
+        shift 2
+        ;;
+      --vault-token-file)
+        [[ $# -ge 2 ]] || die "--vault-token-file requires a value"
+        VAULT_TOKEN_FILE="$2"
+        shift 2
+        ;;
+      --vault-addr)
+        [[ $# -ge 2 ]] || die "--vault-addr requires a value"
+        VAULT_ADDR_OVERRIDE="$2"
+        shift 2
+        ;;
+      --repo-creds-file)
+        [[ $# -ge 2 ]] || die "--repo-creds-file requires a value"
+        REPO_CREDS_FILE="$2"
         shift 2
         ;;
       --dry-run)
@@ -152,68 +188,151 @@ parse_common_args() {
   done
 }
 
-setup_kubectl_args() {
-  local -n out_args="$1"
-  local kubeconfig_value="${2:-}"
-  local context_value="${3:-}"
-
-  out_args=()
-
-  if [[ -n "${kubeconfig_value}" ]]; then
-    out_args+=(--kubeconfig "${kubeconfig_value}")
-  fi
-
-  if [[ -n "${context_value}" ]]; then
-    out_args+=(--context "${context_value}")
-  fi
+usage_common_flags() {
+  cat <<'EOF'
+Common flags:
+  --inventory <path>
+  --management-inventory <path>
+  --workload-inventory <path>   (repeatable)
+  --vault-secrets-dir <path>
+  --vault-token-file <path>
+  --vault-addr <url>
+  --repo-creds-file <path>
+  --dry-run
+EOF
 }
 
-kubectl_wait_rollout() {
-  local namespace="$1"
-  local resource_name="$2"
-  local timeout="${3:-300s}"
-  shift 3
-  local kubectl_args=("$@")
+inventory_value() {
+  local inventory_file="$1"
+  local expression="$2"
 
-  if [[ "${DRY_RUN}" == "true" ]]; then
-    print_command kubectl "${kubectl_args[@]}" -n "${namespace}" rollout status "${resource_name}" --timeout="${timeout}"
+  require_file "${inventory_file}"
+  yq e -r "${expression} // \"\"" "${inventory_file}"
+}
+
+inventory_name() {
+  inventory_value "$1" '.metadata.name'
+}
+
+inventory_role() {
+  inventory_value "$1" '.spec.role'
+}
+
+inventory_environment() {
+  inventory_value "$1" '.spec.environment'
+}
+
+inventory_size_profile() {
+  inventory_value "$1" '.spec.sizeProfile'
+}
+
+inventory_public_edge() {
+  local raw_value
+
+  raw_value="$(inventory_value "$1" '.spec.addons.publicEdge')"
+
+  case "${raw_value,,}" in
+    enabled|true|yes|1)
+      printf 'enabled'
+      ;;
+    disabled|false|no|0|"")
+      printf 'disabled'
+      ;;
+    *)
+      die "Unsupported publicEdge value in $(inventory_name "$1"): ${raw_value}"
+      ;;
+  esac
+}
+
+inventory_internal_domain() {
+  inventory_value "$1" '.spec.network.internalDomain'
+}
+
+inventory_kubeconfig() {
+  inventory_value "$1" '.spec.bootstrap.kubeconfig'
+}
+
+inventory_context() {
+  inventory_value "$1" '.spec.bootstrap.context'
+}
+
+inventory_k3s_token_file() {
+  inventory_value "$1" '.spec.bootstrap.k3sTokenFile'
+}
+
+inventory_vault_auth_mount() {
+  local auth_mount
+
+  auth_mount="$(inventory_value "$1" '.spec.vault.authMount')"
+
+  if [[ -n "${auth_mount}" ]]; then
+    printf '%s' "${auth_mount}"
     return 0
   fi
 
-  kubectl "${kubectl_args[@]}" -n "${namespace}" rollout status "${resource_name}" --timeout="${timeout}"
+  printf 'k8s-%s' "$(inventory_name "$1")"
 }
 
-kubectl_apply_file() {
-  local manifest_file="$1"
-  shift
-  local kubectl_args=("$@")
+inventory_validate() {
+  local inventory_file
+  local cluster_name
 
-  run kubectl "${kubectl_args[@]}" apply -f "${manifest_file}"
-}
+  inventory_file="$(resolve_repo_path "$1")"
+  require_file "${inventory_file}"
 
-kubectl_apply_kustomize() {
-  local kustomize_path="$1"
-  shift
-  local kubectl_args=("$@")
-
-  run kubectl "${kubectl_args[@]}" apply -k "${kustomize_path}"
-}
-
-kubectl_get_json() {
-  local resource_name="$1"
-  shift
-  local kubectl_args=("$@")
-
-  kubectl "${kubectl_args[@]}" get "${resource_name}" -o json
+  cluster_name="$(inventory_name "${inventory_file}")"
+  [[ -n "${cluster_name}" ]] || die "Inventory ${inventory_file} is missing metadata.name"
+  [[ -n "$(inventory_role "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.role"
+  [[ -n "$(inventory_environment "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.environment"
+  [[ -n "$(inventory_size_profile "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.sizeProfile"
+  [[ -n "$(inventory_kubeconfig "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.bootstrap.kubeconfig"
 }
 
 require_kubectl_connectivity() {
   local cluster_label="$1"
   shift
-  local kubectl_args=("$@")
 
-  if ! kubectl "${kubectl_args[@]}" cluster-info >/dev/null 2>&1; then
+  if ! kubectl "$@" cluster-info >/dev/null 2>&1; then
     die "Unable to connect to ${cluster_label} cluster with kubectl"
+  fi
+}
+
+kubectl_apply_file() {
+  local manifest_file="$1"
+  shift
+
+  run kubectl "$@" apply -f "${manifest_file}"
+}
+
+kubectl_apply_kustomize() {
+  local kustomize_path="$1"
+  shift
+
+  run kubectl "$@" apply -k "${kustomize_path}"
+}
+
+kubectl_wait_rollout() {
+  local namespace="$1"
+  local resource_name="$2"
+  local timeout="$3"
+  shift 3
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    print_command kubectl "$@" -n "${namespace}" rollout status "${resource_name}" --timeout="${timeout}"
+    return 0
+  fi
+
+  kubectl "$@" -n "${namespace}" rollout status "${resource_name}" --timeout="${timeout}"
+}
+
+kubectl_wait_rollout_if_exists() {
+  local namespace="$1"
+  local resource_name="$2"
+  local timeout="$3"
+  shift 3
+
+  if kubectl "$@" -n "${namespace}" get "${resource_name}" >/dev/null 2>&1; then
+    kubectl_wait_rollout "${namespace}" "${resource_name}" "${timeout}" "$@"
   fi
 }
 
@@ -247,22 +366,4 @@ wait_for_jsonpath_value() {
 
     sleep 5
   done
-}
-
-load_file_contents() {
-  local file_path="$1"
-  require_file "${file_path}"
-  <"${file_path}" tr -d '\r'
-}
-
-usage_common_flags() {
-  cat <<'EOF'
-Common flags:
-  --config <env-file>
-  --kubeconfig <path>
-  --context <name>
-  --cluster-name <name>
-  --vault-secrets-dir <path>
-  --dry-run
-EOF
 }

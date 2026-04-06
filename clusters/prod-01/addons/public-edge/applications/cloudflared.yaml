@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-01-cloudflared
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  project: public-edge
+  source:
+    repoURL: https://github.com/litomi2026/litomi-gitops.git
+    targetRevision: main
+    path: clusters/prod-01/addons/public-edge/cloudflared
+  destination:
+    name: prod-01
+    namespace: cloudflared
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

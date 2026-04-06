@@ -1,0 +1,15 @@
+tempo:
+  retention: 72h
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+persistence:
+  size: 20Gi
+
+serviceMonitor:
+  interval: 30s

@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - applications/cloudflared.yaml
+  - applications/gtm-server.yaml
+  - applications/litomi.yaml
+  - applications/monitoring.yaml

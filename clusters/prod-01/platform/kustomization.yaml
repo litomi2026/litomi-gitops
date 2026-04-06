@@ -4,16 +4,14 @@ kind: Kustomization
 namespace: argocd
 
 resources:
-  - applications/vault.yaml
+  - applications/longhorn.yaml
+  - applications/metallb.yaml
+  - applications/traefik.yaml
   - applications/external-secrets.yaml
   - applications/metrics-server.yaml
-  - applications/cloudflared.yaml
-  - applications/gtm-server.yaml
   - applications/monitoring.yaml
   - applications/loki.yaml
   - applications/fluent-bit.yaml
   - applications/tempo.yaml
   - applications/otel-collector.yaml
-  - applications/minio-operator.yaml
-  - applications/minio.yaml
   - applications/velero.yaml

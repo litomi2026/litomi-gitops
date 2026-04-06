@@ -4,13 +4,13 @@ metadata:
   name: prod-01-metrics-server
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '2'
+    argocd.argoproj.io/sync-wave: '1'
 spec:
-  project: platform-prod
+  project: platform-workload
   source:
     repoURL: https://github.com/litomi2026/litomi-gitops.git
     targetRevision: main
-    path: apps/platform/metrics-server/overlays/prod
+    path: apps/platform/metrics-server
   destination:
     name: prod-01
     namespace: kube-system

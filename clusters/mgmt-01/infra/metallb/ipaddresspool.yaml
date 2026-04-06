@@ -1,0 +1,7 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: management-ingress
+spec:
+  addresses:
+    - 172.30.10.240-172.30.10.250

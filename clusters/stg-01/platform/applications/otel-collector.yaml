@@ -4,18 +4,18 @@ metadata:
   name: stg-01-otel-collector
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '5'
+    argocd.argoproj.io/sync-wave: '4'
 spec:
-  project: platform-stg
+  project: platform-workload
   sources:
     - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
       chart: opentelemetry-collector
-      targetRevision: 0.145.0
+      targetRevision: 0.147.1
       helm:
         releaseName: opentelemetry-collector
         valueFiles:
-          - $values/apps/platform/tracing/base/opentelemetry-collector.values.yaml
-          - $values/clusters/stg-01/platform/tracing/opentelemetry-collector.values.yaml
+          - $values/apps/platform/tracing/opentelemetry-collector.values.yaml
+          - $values/clusters/stg-01/ops/tracing/opentelemetry-collector.values.yaml
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
       ref: values

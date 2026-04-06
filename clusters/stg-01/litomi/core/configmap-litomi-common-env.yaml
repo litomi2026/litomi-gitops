@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litomi-common-env
+data:
+  APP_ENV: stg
+  APP_ORIGIN: https://app.stg.litomi.internal
+  REDIS_URL: redis://redis:6379
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.tracing.svc:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_TRACES_SAMPLER: parentbased_traceidratio
+  OTEL_TRACES_SAMPLER_ARG: '0.3'
+  OTEL_PROPAGATORS: tracecontext,baggage
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=litomi,deployment.environment=stg
+  POSTGRES_HEALTHCHECK_CACHE_MS: '15000'

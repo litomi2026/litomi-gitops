@@ -1,0 +1,24 @@
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: litomi-mgmt-velero
+      default: true
+      accessMode: ReadWrite
+      credential:
+        name: velero-cloud-credentials
+        key: cloud
+      config:
+        region: us-east-1
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.mgmt.litomi.internal
+
+schedules:
+  daily:
+    template:
+      includedNamespaces:
+        - argocd
+        - vault
+        - minio
+        - monitoring
+        - logging

@@ -1,0 +1,41 @@
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: litomi-stg-velero
+      default: true
+      accessMode: ReadWrite
+      credential:
+        name: velero-cloud-credentials
+        key: cloud
+      config:
+        region: us-east-1
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.mgmt.litomi.internal
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+nodeAgent:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+schedules:
+  daily:
+    template:
+      ttl: "72h"
+      includedNamespaces:
+        - monitoring
+        - logging
+        - tracing
+        - litomi

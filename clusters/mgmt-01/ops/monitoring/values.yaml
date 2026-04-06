@@ -1,0 +1,21 @@
+grafana:
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki.logging.svc:3100
+      isDefault: false
+
+prometheus:
+  prometheusSpec:
+    externalLabels:
+      cluster: mgmt-01
+    retention: 15d
+    retentionSize: 80GiB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 80Gi

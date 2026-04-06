@@ -4,18 +4,18 @@ metadata:
   name: prod-01-fluent-bit
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '5'
+    argocd.argoproj.io/sync-wave: '4'
 spec:
-  project: platform-prod
+  project: platform-workload
   sources:
     - repoURL: https://fluent.github.io/helm-charts
       chart: fluent-bit
-      targetRevision: 0.55.0
+      targetRevision: 0.57.2
       helm:
         releaseName: fluent-bit
         valueFiles:
-          - $values/apps/platform/logging/base/fluent-bit.values.yaml
-          - $values/clusters/prod-01/platform/logging/fluent-bit.values.yaml
+          - $values/apps/platform/logging/fluent-bit.values.yaml
+          - $values/clusters/prod-01/ops/logging/fluent-bit.values.yaml
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
       ref: values

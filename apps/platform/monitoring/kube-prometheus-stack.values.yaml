@@ -1,0 +1,143 @@
+# kube-prometheus-stack values shared across Litomi management/workload clusters.
+
+defaultRules:
+  create: true
+  rules:
+    # k3s: control plane components usually aren't exposed as scrapeable Services by default.
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+
+    # Reduce noise/overhead: keep apiserver availability only.
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+
+    # This cluster doesn't run Windows nodes.
+    windows: false
+
+  disabled:
+    # Always-firing "pipeline health" alerts. Keep them off to reduce noise.
+    # If you want “alerting pipeline is alive” verification, enable and route/silence intentionally.
+    Watchdog: true
+    InfoInhibitor: true
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: 'null'
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        # Drop info-level alerts by default.
+        - receiver: 'null'
+          matchers:
+            - severity="info"
+    receivers:
+      - name: 'null'
+    inhibit_rules:
+      # Critical inhibits warning for the same thing.
+      - source_matchers:
+          - severity="critical"
+        target_matchers:
+          - severity="warning"
+        equal: ['alertname', 'namespace']
+      # Warning inhibits info for the same thing.
+      - source_matchers:
+          - severity="warning"
+        target_matchers:
+          - severity="info"
+        equal: ['alertname', 'namespace']
+
+  alertmanagerSpec:
+    alertmanagerConfigSelector:
+      matchLabels:
+        alertmanagerConfig: enabled
+    alertmanagerConfigMatcherStrategy:
+      type: None
+    replicas: 3
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ['ReadWriteOnce']
+          resources:
+            requests:
+              storage: 5Gi
+
+grafana:
+  enabled: true
+  replicas: 2
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin_user
+    passwordKey: admin_password
+  deploymentStrategy:
+    type: RollingUpdate
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# k3s: control plane components usually aren't exposed as scrapeable Services by default.
+kubeControllerManager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+prometheusOperator:
+  # Kubernetes v1.33+에서 Endpoints(v1)는 deprecated라서, kubelet 대상도 EndpointSlice로 만들어요.
+  kubeletEndpointsEnabled: false
+  kubeletEndpointSliceEnabled: true
+
+prometheus:
+  prometheusSpec:
+    replicas: 2
+
+    externalLabels:
+      cluster: default
+
+    # Kubernetes v1.33+에서 Endpoints(v1)는 deprecated라서, Prometheus 서비스 디스커버리를 EndpointSlice로 전환해요.
+    serviceDiscoveryRole: EndpointSlice
+
+    retention: 14d
+    retentionSize: 60GiB
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: '2'
+        memory: 4Gi
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ['ReadWriteOnce']
+          resources:
+            requests:
+              storage: 50Gi

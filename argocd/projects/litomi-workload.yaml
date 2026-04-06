@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: litomi-workload
+spec:
+  description: Litomi workloads for staging and production clusters
+  sourceRepos:
+    - https://github.com/litomi2026/litomi-gitops.git
+    - https://charts.bitnami.com/bitnami
+  destinations:
+    - name: stg-01
+      namespace: litomi
+    - name: prod-01
+      namespace: litomi
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true
+  permitOnlyProjectScopedClusters: true

@@ -1,4 +1,0 @@
-prometheus:
-  prometheusSpec:
-    externalLabels:
-      cluster: prod-01

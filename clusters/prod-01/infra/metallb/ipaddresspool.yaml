@@ -1,0 +1,7 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: workload-ingress
+spec:
+  addresses:
+    - 172.30.30.240-172.30.30.250

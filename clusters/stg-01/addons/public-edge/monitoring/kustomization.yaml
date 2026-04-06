@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - ../../../../../apps/platform/monitoring/configmap-blackbox-exporter.yaml
+  - ../../../../../apps/platform/monitoring/deployment-blackbox-exporter.yaml
+  - ../../../../../apps/platform/monitoring/service-blackbox-exporter.yaml
+  - ../../../../../apps/platform/monitoring/servicemonitor-cloudflared.yaml
+  - probe-blackbox-public-endpoints.yaml

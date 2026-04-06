@@ -1,0 +1,55 @@
+deployment:
+  replicas: 2
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  name: traefik
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+
+additionalArguments:
+  - --api.dashboard=true
+  - --entrypoints.web.address=:80
+  - --entrypoints.traefik.address=:9000
+  - --ping=true
+  - --metrics.prometheus=true
+
+ports:
+  web:
+    expose:
+      default: true
+    exposedPort: 80
+  traefik:
+    expose:
+      default: false
+  metrics:
+    expose:
+      default: true
+    exposedPort: 9100
+
+service:
+  enabled: true
+  type: LoadBalancer
+
+logs:
+  general:
+    level: INFO
+
+metrics:
+  prometheus:
+    service:
+      enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+        app.kubernetes.io/instance: kube-prometheus-stack

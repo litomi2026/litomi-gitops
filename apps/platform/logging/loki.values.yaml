@@ -1,0 +1,121 @@
+# Loki Helm chart values (grafana/loki)
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: s3
+    bucketNames:
+      chunks: ${LOKI_BUCKET_CHUNKS}
+      ruler: ${LOKI_BUCKET_RULER}
+    s3:
+      endpoint: minio.mgmt.litomi.internal
+      accessKeyId: ${LOKI_S3_ACCESS_KEY}
+      secretAccessKey: ${LOKI_S3_SECRET_KEY}
+      s3ForcePathStyle: true
+      insecure: true
+  schemaConfig:
+    configs:
+      - from: '2024-04-01'
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  ingester:
+    chunk_encoding: snappy
+  limits_config:
+    retention_period: 168h
+  compactor:
+    retention_enabled: true
+    # Loki 3.x validates this when retention is enabled; omit하면 프로세스가 기동 직후 종료돼요.
+    delete_request_store: s3
+  tracing:
+    enabled: true
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: '2'
+      memory: 2Gi
+  extraArgs:
+    - -config.expand-env=true
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: 1800MiB
+    - name: LOKI_S3_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: loki-minio
+          key: access_key
+    - name: LOKI_S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: loki-minio
+          key: secret_key
+    - name: LOKI_BUCKET_CHUNKS
+      valueFrom:
+        secretKeyRef:
+          name: loki-minio
+          key: bucket_chunks
+    - name: LOKI_BUCKET_RULER
+      valueFrom:
+        secretKeyRef:
+          name: loki-minio
+          key: bucket_ruler
+
+chunksCache:
+  enabled: false
+
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+ingester:
+  replicas: 0
+querier:
+  replicas: 0
+queryFrontend:
+  replicas: 0
+queryScheduler:
+  replicas: 0
+distributor:
+  replicas: 0
+compactor:
+  replicas: 0
+indexGateway:
+  replicas: 0
+bloomCompactor:
+  replicas: 0
+bloomGateway:
+  replicas: 0
+
+gateway:
+  enabled: false
+
+minio:
+  enabled: false
+
+monitoring:
+  dashboards:
+    enabled: true
+  rules:
+    enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+      app.kubernetes.io/instance: kube-prometheus-stack

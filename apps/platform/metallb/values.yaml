@@ -1,0 +1,20 @@
+controller:
+  webhookMode: enabled
+
+speaker:
+  tolerateMaster: true
+
+prometheus:
+  serviceMonitor:
+    enabled: true
+    controller:
+      additionalLabels:
+        release: kube-prometheus-stack
+        app.kubernetes.io/instance: kube-prometheus-stack
+    speaker:
+      additionalLabels:
+        release: kube-prometheus-stack
+        app.kubernetes.io/instance: kube-prometheus-stack
+
+crds:
+  enabled: true
