@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - ../../../../../apps/litomi/public-edge/gtm-server
+  - resourcequota-gtm-server-runtime.yaml
   - secretstore-vault.yaml
   - externalsecret-gtm-server-secret.yaml
   - ingress.yaml

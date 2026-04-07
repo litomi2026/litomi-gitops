@@ -62,7 +62,7 @@ alertmanager:
         alertmanagerConfig: enabled
     alertmanagerConfigMatcherStrategy:
       type: None
-    replicas: 3
+    replicas: 1
     resources:
       requests:
         cpu: 100m
@@ -80,7 +80,7 @@ alertmanager:
 
 grafana:
   enabled: true
-  replicas: 2
+  replicas: 1
   admin:
     existingSecret: grafana-admin
     userKey: admin_user
@@ -115,7 +115,7 @@ prometheusOperator:
 
 prometheus:
   prometheusSpec:
-    replicas: 2
+    replicas: 1
 
     externalLabels:
       cluster: default

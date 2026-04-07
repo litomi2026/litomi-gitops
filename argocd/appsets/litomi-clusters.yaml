@@ -6,9 +6,21 @@ spec:
   generators:
     - clusters:
         selector:
-          matchLabels:
-            tenant: litomi
-            role: workload
+          matchExpressions:
+            - key: tenant
+              operator: In
+              values:
+                - litomi
+            - key: litomi.io/cluster-class
+              operator: In
+              values:
+                - environment-runtime
+            - key: environment
+              operator: In
+              values:
+                - prod
+                - stg
+                - dev
   template:
     metadata:
       name: litomi-{{name}}

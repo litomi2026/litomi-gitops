@@ -1,4 +1,4 @@
 # MinIO 공식 Operator Helm values (minio/operator)
 
 operator:
-  replicaCount: 2
+  replicaCount: 1

@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DRY_RUN=false
 INVENTORY_FILE=""
 MANAGEMENT_INVENTORY_FILE=""
-WORKLOAD_INVENTORY_FILES=()
+REMOTE_INVENTORY_FILES=()
 VAULT_SECRETS_DIR="/secure/vault-secrets"
 VAULT_TOKEN_FILE=""
 VAULT_ADDR_OVERRIDE=""
@@ -151,7 +151,12 @@ parse_common_args() {
         ;;
       --workload-inventory)
         [[ $# -ge 2 ]] || die "--workload-inventory requires a value"
-        WORKLOAD_INVENTORY_FILES+=("$2")
+        REMOTE_INVENTORY_FILES+=("$2")
+        shift 2
+        ;;
+      --remote-inventory)
+        [[ $# -ge 2 ]] || die "--remote-inventory requires a value"
+        REMOTE_INVENTORY_FILES+=("$2")
         shift 2
         ;;
       --vault-secrets-dir)
@@ -193,7 +198,8 @@ usage_common_flags() {
 Common flags:
   --inventory <path>
   --management-inventory <path>
-  --workload-inventory <path>   (repeatable)
+  --remote-inventory <path>     (repeatable)
+  --workload-inventory <path>   (repeatable, legacy alias)
   --vault-secrets-dir <path>
   --vault-token-file <path>
   --vault-addr <url>
@@ -222,8 +228,12 @@ inventory_environment() {
   inventory_value "$1" '.spec.environment'
 }
 
-inventory_size_profile() {
-  inventory_value "$1" '.spec.sizeProfile'
+inventory_cluster_class() {
+  inventory_value "$1" '.spec.clusterClass'
+}
+
+inventory_control_plane_mode() {
+  inventory_value "$1" '.spec.controlPlaneMode'
 }
 
 inventory_internal_domain() {
@@ -266,7 +276,8 @@ inventory_validate() {
   [[ -n "${cluster_name}" ]] || die "Inventory ${inventory_file} is missing metadata.name"
   [[ -n "$(inventory_role "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.role"
   [[ -n "$(inventory_environment "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.environment"
-  [[ -n "$(inventory_size_profile "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.sizeProfile"
+  [[ -n "$(inventory_cluster_class "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.clusterClass"
+  [[ -n "$(inventory_control_plane_mode "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.controlPlaneMode"
   [[ -n "$(inventory_kubeconfig "${inventory_file}")" ]] || die "Inventory ${inventory_file} is missing spec.bootstrap.kubeconfig"
 }
 

@@ -1,0 +1,8 @@
+tempo:
+  storage:
+    trace:
+      s3:
+        bucket: litomi-mgmt-tempo
+
+serviceMonitor:
+  enabled: true

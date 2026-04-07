@@ -1,0 +1,7 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: litomi-runtime
+value: 100000
+globalDefault: false
+description: Priority for prod runtime workloads on environment-runtime clusters.

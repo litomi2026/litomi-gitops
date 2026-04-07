@@ -5,7 +5,8 @@ metadata:
 spec:
   role: workload
   environment: prod
-  sizeProfile: production-ha
+  clusterClass: environment-runtime
+  controlPlaneMode: single-server-elastic-workers
   network:
     internalDomain: prod.litomi.internal
     apiVip: 172.30.30.10
@@ -29,8 +30,8 @@ spec:
     - name: prod-01-b
       address: 172.30.30.12
       roles:
-        - server
+        - worker
     - name: prod-01-c
       address: 172.30.30.13
       roles:
-        - server
+        - worker

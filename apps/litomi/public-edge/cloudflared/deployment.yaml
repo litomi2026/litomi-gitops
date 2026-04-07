@@ -16,6 +16,7 @@ spec:
       enableServiceLinks: false
       serviceAccountName: cloudflared
       automountServiceAccountToken: false
+      priorityClassName: litomi-runtime
       securityContext:
         seccompProfile:
           type: RuntimeDefault

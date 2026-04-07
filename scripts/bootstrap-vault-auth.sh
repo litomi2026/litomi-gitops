@@ -10,9 +10,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/bootstrap-vault-auth.sh [common flags]
 
-Configures the central Vault Kubernetes auth mounts for mgmt-01, stg-01, and
-prod-01 inventories, then writes cluster-scoped ESO policies and roles that map
-to the GitOps SecretStores in this repository.
+Configures the central Vault Kubernetes auth mounts for the requested
+inventories, then writes cluster-scoped ESO policies and roles that map to the
+GitOps SecretStores in this repository.
 EOF
   usage_common_flags
 }
@@ -62,13 +62,13 @@ upsert_vault_role() {
 
 configure_inventory() {
   local inventory_file="$1"
-  local cluster_name cluster_role auth_mount
+  local cluster_name cluster_class auth_mount
   local kubeconfig_path kube_context
   local cluster_config_json cluster_server cluster_ca cluster_ca_pem
   local reviewer_serviceaccount reviewer_binding reviewer_manifest reviewer_jwt
 
   cluster_name="$(inventory_name "${inventory_file}")"
-  cluster_role="$(inventory_role "${inventory_file}")"
+  cluster_class="$(inventory_cluster_class "${inventory_file}")"
   auth_mount="$(inventory_vault_auth_mount "${inventory_file}")"
   kubeconfig_path="$(resolve_repo_path "$(inventory_kubeconfig "${inventory_file}")")"
   kube_context="$(inventory_context "${inventory_file}")"
@@ -133,7 +133,7 @@ EOF
     kubernetes_ca_cert="${cluster_ca_pem}" \
     token_reviewer_jwt="${reviewer_jwt}"
 
-  if [[ "${cluster_role}" == "management" ]]; then
+  if [[ "${cluster_class}" == "management" ]]; then
     write_policy "eso-${cluster_name}-argocd" "kv" \
       "clusters/${cluster_name}/argocd/github-repo-creds"
     upsert_vault_role "${auth_mount}" "eso-argocd" "argocd" "eso-${cluster_name}-argocd" "vault" "1h" "24h"
@@ -152,24 +152,14 @@ EOF
       "clusters/${cluster_name}/logging/loki-s3"
     upsert_vault_role "${auth_mount}" "eso-logging" "logging" "eso-${cluster_name}-logging" "vault" "1h" "24h"
 
-    write_policy "eso-${cluster_name}-velero" "kv" \
-      "clusters/${cluster_name}/velero/velero-cloud-credentials"
-    upsert_vault_role "${auth_mount}" "eso-velero" "velero" "eso-${cluster_name}-velero" "vault" "1h" "24h"
-  else
-    write_policy "eso-${cluster_name}-monitoring" "kv" \
-      "clusters/${cluster_name}/monitoring/grafana-admin" \
-      "clusters/${cluster_name}/monitoring/alertmanager-webhook-warning" \
-      "clusters/${cluster_name}/monitoring/alertmanager-webhook-critical"
-    upsert_vault_role "${auth_mount}" "eso-monitoring" "monitoring" "eso-${cluster_name}-monitoring" "vault" "1h" "24h"
-
-    write_policy "eso-${cluster_name}-logging" "kv" \
-      "clusters/${cluster_name}/logging/loki-s3"
-    upsert_vault_role "${auth_mount}" "eso-logging" "logging" "eso-${cluster_name}-logging" "vault" "1h" "24h"
-
     write_policy "eso-${cluster_name}-tracing" "kv" \
       "clusters/${cluster_name}/tracing/tempo-s3"
     upsert_vault_role "${auth_mount}" "eso-tracing" "tracing" "eso-${cluster_name}-tracing" "vault" "1h" "24h"
 
+    write_policy "eso-${cluster_name}-velero" "kv" \
+      "clusters/${cluster_name}/velero/velero-cloud-credentials"
+    upsert_vault_role "${auth_mount}" "eso-velero" "velero" "eso-${cluster_name}-velero" "vault" "1h" "24h"
+  elif [[ "${cluster_class}" == "environment-runtime" ]]; then
     write_policy "eso-${cluster_name}-velero" "kv" \
       "clusters/${cluster_name}/velero/velero-cloud-credentials"
     upsert_vault_role "${auth_mount}" "eso-velero" "velero" "eso-${cluster_name}-velero" "vault" "1h" "24h"
@@ -185,6 +175,8 @@ EOF
     write_policy "eso-${cluster_name}-gtm-server" "kv" \
       "clusters/${cluster_name}/gtm-server/gtm-server-secret"
     upsert_vault_role "${auth_mount}" "eso-gtm-server" "gtm-server" "eso-${cluster_name}-gtm-server" "vault" "1h" "24h"
+  else
+    die "Unsupported cluster class for ${cluster_name}: ${cluster_class}"
   fi
 
   rm -f "${reviewer_manifest}"
@@ -207,17 +199,24 @@ if [[ -n "${INVENTORY_FILE}" ]]; then
   target_inventories+=("$(resolve_repo_path "${INVENTORY_FILE}")")
 fi
 
-for workload_inventory in "${WORKLOAD_INVENTORY_FILES[@]}"; do
-  target_inventories+=("$(resolve_repo_path "${workload_inventory}")")
+for remote_inventory in "${REMOTE_INVENTORY_FILES[@]}"; do
+  target_inventories+=("$(resolve_repo_path "${remote_inventory}")")
 done
 
-(( ${#target_inventories[@]} > 0 )) || die "Provide at least one inventory via --management-inventory, --inventory, or --workload-inventory"
+(( ${#target_inventories[@]} > 0 )) || die "Provide at least one inventory via --management-inventory, --inventory, or --remote-inventory"
 
 for inventory_file in "${target_inventories[@]}"; do
   inventory_validate "${inventory_file}"
 done
 
-vault_addr="${VAULT_ADDR_OVERRIDE:-https://vault.mgmt.litomi.internal}"
+if [[ -n "${MANAGEMENT_INVENTORY_FILE}" ]]; then
+  management_inventory_resolved="$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")"
+  vault_addr_default="https://vault.$(inventory_internal_domain "${management_inventory_resolved}")"
+else
+  vault_addr_default="https://vault.mgmt.litomi.internal"
+fi
+
+vault_addr="${VAULT_ADDR_OVERRIDE:-${vault_addr_default}}"
 vault_token_file="$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
 [[ -n "${vault_token_file}" ]] || die "--vault-token-file is required"
 require_file "${vault_token_file}"

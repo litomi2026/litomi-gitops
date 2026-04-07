@@ -6,5 +6,7 @@ namespace: argocd
 resources:
   - applications/monitoring.yaml
   - applications/loki.yaml
+  - applications/tempo.yaml
+  - applications/otel-collector.yaml
   - applications/fluent-bit.yaml
   - applications/velero.yaml

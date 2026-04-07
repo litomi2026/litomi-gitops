@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - ../../../../../apps/litomi/public-edge/cloudflared
+  - resourcequota-cloudflared-runtime.yaml
   - secretstore-vault.yaml
   - externalsecret-cloudflared-token.yaml

@@ -12,7 +12,7 @@ spec:
       chart: valkey
       targetRevision: 5.4.9
       helm:
-        releaseName: redis-ha
+        releaseName: redis
         valueFiles:
           - $values/clusters/stg-01/litomi/redis/values.yaml
     - repoURL: https://github.com/litomi2026/litomi-gitops.git

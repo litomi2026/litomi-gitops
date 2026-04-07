@@ -4,7 +4,6 @@ kind: Kustomization
 namespace: argocd
 
 resources:
-  - applications/longhorn.yaml
   - applications/metallb.yaml
   - applications/traefik.yaml
   - applications/external-secrets.yaml

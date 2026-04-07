@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gtm-server-runtime
+  namespace: gtm-server
+spec:
+  hard:
+    pods: "10"
+    services: "5"
+    requests.cpu: "1"
+    requests.memory: 2Gi
+    limits.cpu: "3"
+    limits.memory: 4Gi

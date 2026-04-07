@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mgmt-01-otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '7'
+spec:
+  project: platform-mgmt
+  sources:
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-collector
+      targetRevision: 0.147.1
+      helm:
+        releaseName: opentelemetry-collector
+        valueFiles:
+          - $values/apps/platform/tracing/opentelemetry-collector.values.yaml
+          - $values/clusters/mgmt-01/ops/tracing/opentelemetry-collector.values.yaml
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tracing
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

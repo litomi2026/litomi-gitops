@@ -8,4 +8,6 @@ resources:
   - externalsecret-alertmanager-webhook-warning.yaml
   - externalsecret-alertmanager-webhook-critical.yaml
   - ingress-grafana.yaml
+  - probe-blackbox-public-endpoints-prod.yaml
+  - probe-blackbox-public-endpoints-stg.yaml
   - ../../../../apps/platform/monitoring/servicemonitor-argocd.yaml

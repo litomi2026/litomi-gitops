@@ -7,4 +7,3 @@ resources:
   - applications/litomi.yaml
   - applications/cloudflared.yaml
   - applications/gtm-server.yaml
-  - applications/observability.yaml

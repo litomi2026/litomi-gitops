@@ -14,7 +14,7 @@ tenant:
 
   pools:
     - name: pool-0
-      servers: 4
+      servers: 1
       volumesPerServer: 1
       size: 50Gi
       securityContext:
@@ -67,14 +67,9 @@ tenant:
     - name: litomi-mgmt-velero
     - name: litomi-mgmt-loki-chunks
     - name: litomi-mgmt-loki-ruler
+    - name: litomi-mgmt-tempo
     - name: litomi-stg-velero
     - name: litomi-prod-velero
-    - name: litomi-stg-loki-chunks
-    - name: litomi-stg-loki-ruler
-    - name: litomi-prod-loki-chunks
-    - name: litomi-prod-loki-ruler
-    - name: litomi-stg-tempo
-    - name: litomi-prod-tempo
 
   metrics:
     enabled: true

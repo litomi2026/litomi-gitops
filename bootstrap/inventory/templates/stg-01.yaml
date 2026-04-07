@@ -5,7 +5,8 @@ metadata:
 spec:
   role: workload
   environment: stg
-  sizeProfile: small-ha
+  clusterClass: environment-runtime
+  controlPlaneMode: single-server-elastic-workers
   network:
     internalDomain: stg.litomi.internal
     apiVip: 172.30.20.10
@@ -29,8 +30,8 @@ spec:
     - name: stg-01-b
       address: 172.30.20.12
       roles:
-        - server
+        - worker
     - name: stg-01-c
       address: 172.30.20.13
       roles:
-        - server
+        - worker

@@ -28,11 +28,11 @@ require_command kubectl jq yq git vault openssl base64
 management_inventory="$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")"
 inventory_validate "${management_inventory}"
 
-workload_inventories=()
-for workload_inventory in "${WORKLOAD_INVENTORY_FILES[@]}"; do
-  resolved_inventory="$(resolve_repo_path "${workload_inventory}")"
+remote_inventories=()
+for remote_inventory in "${REMOTE_INVENTORY_FILES[@]}"; do
+  resolved_inventory="$(resolve_repo_path "${remote_inventory}")"
   inventory_validate "${resolved_inventory}"
-  workload_inventories+=("${resolved_inventory}")
+  remote_inventories+=("${resolved_inventory}")
 done
 
 management_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${management_inventory}")")"
@@ -57,25 +57,25 @@ for permission in \
   fi
 done
 
-for workload_inventory in "${workload_inventories[@]}"; do
-  workload_name="$(inventory_name "${workload_inventory}")"
-  workload_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${workload_inventory}")")"
-  workload_context="$(inventory_context "${workload_inventory}")"
-  require_file "${workload_kubeconfig}"
+for remote_inventory in "${remote_inventories[@]}"; do
+  remote_name="$(inventory_name "${remote_inventory}")"
+  remote_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${remote_inventory}")")"
+  remote_context="$(inventory_context "${remote_inventory}")"
+  require_file "${remote_kubeconfig}"
 
-  workload_kubectl_args=()
-  workload_kubectl_args+=(--kubeconfig "${workload_kubeconfig}")
-  if [[ -n "${workload_context}" ]]; then
-    workload_kubectl_args+=(--context "${workload_context}")
+  remote_kubectl_args=()
+  remote_kubectl_args+=(--kubeconfig "${remote_kubeconfig}")
+  if [[ -n "${remote_context}" ]]; then
+    remote_kubectl_args+=(--context "${remote_context}")
   fi
 
-  require_kubectl_connectivity "${workload_name}" "${workload_kubectl_args[@]}"
+  require_kubectl_connectivity "${remote_name}" "${remote_kubectl_args[@]}"
 
   for permission in \
     "create clusterrolebindings.rbac.authorization.k8s.io" \
     "create serviceaccounts -n external-secrets"; do
-    if ! kubectl "${workload_kubectl_args[@]}" auth can-i ${permission} >/dev/null; then
-      die "Workload cluster permission check failed for ${workload_name}: kubectl auth can-i ${permission}"
+    if ! kubectl "${remote_kubectl_args[@]}" auth can-i ${permission} >/dev/null; then
+      die "Remote cluster permission check failed for ${remote_name}: kubectl auth can-i ${permission}"
     fi
   done
 done
@@ -83,7 +83,8 @@ done
 vault_secrets_dir="$(resolve_repo_path "${VAULT_SECRETS_DIR}")"
 require_dir "${vault_secrets_dir}"
 
-repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/mgmt-01/argocd/github-repo-creds.env}"
+management_cluster_name="$(inventory_name "${management_inventory}")"
+repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/${management_cluster_name}/argocd/github-repo-creds.env}"
 repo_creds_file="$(resolve_repo_path "${repo_creds_file}")"
 require_file "${repo_creds_file}"
 
@@ -94,7 +95,7 @@ fi
 templates_root="$(resolve_repo_path "bootstrap/secrets/templates/clusters")"
 require_dir "${templates_root}"
 
-cluster_inventories=("${management_inventory}" "${workload_inventories[@]}")
+cluster_inventories=("${management_inventory}" "${remote_inventories[@]}")
 
 for inventory_file in "${cluster_inventories[@]}"; do
   cluster_name="$(inventory_name "${inventory_file}")"

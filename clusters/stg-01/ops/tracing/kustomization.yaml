@@ -3,5 +3,3 @@ kind: Kustomization
 
 resources:
   - ../../../../apps/platform/tracing
-  - secretstore-vault.yaml
-  - externalsecret-tempo-minio.yaml

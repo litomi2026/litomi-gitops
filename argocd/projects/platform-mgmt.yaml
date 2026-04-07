@@ -8,12 +8,13 @@ spec:
     - https://github.com/litomi2026/litomi-gitops.git
     - https://prometheus-community.github.io/helm-charts
     - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
     - https://fluent.github.io/helm-charts
+    - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://helm.releases.hashicorp.com
     - https://charts.external-secrets.io
     - https://operator.min.io
     - https://vmware-tanzu.github.io/helm-charts
-    - https://charts.longhorn.io
     - https://metallb.github.io/metallb
     - https://traefik.github.io/charts
   destinations:
@@ -21,8 +22,6 @@ spec:
       namespace: argocd
     - server: https://kubernetes.default.svc
       namespace: external-secrets
-    - server: https://kubernetes.default.svc
-      namespace: longhorn-system
     - server: https://kubernetes.default.svc
       namespace: metallb-system
     - server: https://kubernetes.default.svc
@@ -37,6 +36,8 @@ spec:
       namespace: monitoring
     - server: https://kubernetes.default.svc
       namespace: logging
+    - server: https://kubernetes.default.svc
+      namespace: tracing
     - server: https://kubernetes.default.svc
       namespace: velero
   clusterResourceWhitelist:
@@ -54,14 +55,14 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
-    - group: storage.k8s.io
-      kind: StorageClass
     - group: metallb.io
       kind: IPAddressPool
     - group: metallb.io
       kind: L2Advertisement
     - group: traefik.io
       kind: ServersTransport
+    - group: traefik.io
+      kind: IngressRouteTCP
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'

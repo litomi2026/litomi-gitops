@@ -5,7 +5,8 @@ metadata:
 spec:
   role: management
   environment: mgmt
-  sizeProfile: control-plane-ha
+  clusterClass: management
+  controlPlaneMode: single-server-elastic-workers
   network:
     internalDomain: mgmt.litomi.internal
     apiVip: 172.30.10.10
@@ -29,8 +30,8 @@ spec:
     - name: mgmt-01-b
       address: 172.30.10.12
       roles:
-        - server
+        - worker
     - name: mgmt-01-c
       address: 172.30.10.13
       roles:
-        - server
+        - worker

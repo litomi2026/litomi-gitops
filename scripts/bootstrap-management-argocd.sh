@@ -10,9 +10,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/bootstrap-management-argocd.sh --management-inventory <path> [common flags]
 
-Bootstraps Argo CD HA on the management cluster, creates the temporary Git repo
+Bootstraps Argo CD on the management cluster, creates the temporary Git repo
 credential secret from /secure input, applies the root Application, and
-optionally registers workload clusters declared via --workload-inventory.
+optionally registers remote clusters declared via --remote-inventory.
 EOF
   usage_common_flags
 }
@@ -28,11 +28,11 @@ require_command kubectl jq yq base64
 management_inventory="$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")"
 inventory_validate "${management_inventory}"
 
-workload_inventories=()
-for workload_inventory in "${WORKLOAD_INVENTORY_FILES[@]}"; do
-  resolved_inventory="$(resolve_repo_path "${workload_inventory}")"
+remote_inventories=()
+for remote_inventory in "${REMOTE_INVENTORY_FILES[@]}"; do
+  resolved_inventory="$(resolve_repo_path "${remote_inventory}")"
   inventory_validate "${resolved_inventory}"
-  workload_inventories+=("${resolved_inventory}")
+  remote_inventories+=("${resolved_inventory}")
 done
 
 management_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${management_inventory}")")"
@@ -52,7 +52,8 @@ bootstrap_timeout="600s"
 argocd_bootstrap_kustomize="$(resolve_repo_path "bootstrap/argocd")"
 root_app_manifest="$(resolve_repo_path "bootstrap/root/root.yaml")"
 vault_secrets_dir="$(resolve_repo_path "${VAULT_SECRETS_DIR}")"
-repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/mgmt-01/argocd/github-repo-creds.env}"
+management_cluster_name="$(inventory_name "${management_inventory}")"
+repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/${management_cluster_name}/argocd/github-repo-creds.env}"
 repo_creds_file="$(resolve_repo_path "${repo_creds_file}")"
 
 require_file "${root_app_manifest}"
@@ -63,7 +64,7 @@ bootstrap_repo_type="$(env_file_value "${repo_creds_file}" "type")"
 bootstrap_repo_username="$(env_file_value "${repo_creds_file}" "username")"
 bootstrap_repo_password="$(env_file_value "${repo_creds_file}" "password")"
 
-log "Applying Argo CD HA bootstrap manifests on $(inventory_name "${management_inventory}")"
+log "Applying Argo CD bootstrap manifests on $(inventory_name "${management_inventory}")"
 kubectl_apply_kustomize "${argocd_bootstrap_kustomize}" "${management_kubectl_args[@]}"
 
 for resource_name in \
@@ -71,8 +72,7 @@ for resource_name in \
   deployment/argocd-repo-server \
   deployment/argocd-applicationset-controller \
   statefulset/argocd-application-controller \
-  deployment/argocd-redis-ha-haproxy \
-  statefulset/argocd-redis-ha-server; do
+  deployment/argocd-redis; do
   kubectl_wait_rollout_if_exists "${argocd_namespace}" "${resource_name}" "${bootstrap_timeout}" "${management_kubectl_args[@]}"
 done
 
@@ -109,14 +109,15 @@ wait_for_jsonpath_value \
   '{.status.sync.status}' \
   kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application root
 
-for workload_inventory in "${workload_inventories[@]}"; do
-  cluster_name="$(inventory_name "${workload_inventory}")"
+for remote_inventory in "${remote_inventories[@]}"; do
+  cluster_name="$(inventory_name "${remote_inventory}")"
+  cluster_class="$(inventory_cluster_class "${remote_inventory}")"
 
-  log "Registering workload cluster ${cluster_name}"
+  log "Registering remote cluster ${cluster_name}"
   register_cmd=(
-    "${SCRIPT_DIR}/register-workload-cluster.sh"
+    "${SCRIPT_DIR}/register-remote-cluster.sh"
     --management-inventory "${management_inventory}"
-    --inventory "${workload_inventory}"
+    --inventory "${remote_inventory}"
   )
 
   if [[ "${DRY_RUN}" == "true" ]]; then
@@ -132,12 +133,16 @@ for workload_inventory in "${workload_inventories[@]}"; do
     '{.metadata.name}' \
     kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application "platform-${cluster_name}"
 
-  wait_for_jsonpath_value \
-    "litomi parent application ${cluster_name}" \
-    "litomi-${cluster_name}" \
-    300 \
-    '{.metadata.name}' \
-    kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application "litomi-${cluster_name}"
+  case "${cluster_class}" in
+    environment-runtime)
+      wait_for_jsonpath_value \
+        "litomi parent application ${cluster_name}" \
+        "litomi-${cluster_name}" \
+        300 \
+        '{.metadata.name}' \
+        kubectl "${management_kubectl_args[@]}" -n "${argocd_namespace}" get application "litomi-${cluster_name}"
+      ;;
+  esac
 done
 
 log "Management cluster bootstrap completed."

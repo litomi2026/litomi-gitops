@@ -55,7 +55,14 @@ fi
 
 require_command vault find
 
-vault_addr="${VAULT_ADDR_OVERRIDE:-https://vault.mgmt.litomi.internal}"
+if [[ -n "${MANAGEMENT_INVENTORY_FILE}" ]]; then
+  management_inventory_resolved="$(resolve_repo_path "${MANAGEMENT_INVENTORY_FILE}")"
+  vault_addr_default="https://vault.$(inventory_internal_domain "${management_inventory_resolved}")"
+else
+  vault_addr_default="https://vault.mgmt.litomi.internal"
+fi
+
+vault_addr="${VAULT_ADDR_OVERRIDE:-${vault_addr_default}}"
 vault_token_file="$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
 vault_secrets_dir="$(resolve_repo_path "${VAULT_SECRETS_DIR}")"
 templates_root="$(resolve_repo_path "bootstrap/secrets/templates/clusters")"

@@ -16,6 +16,7 @@ spec:
       enableServiceLinks: false
       serviceAccountName: litomi-backend
       automountServiceAccountToken: false
+      priorityClassName: litomi-runtime
       securityContext:
         seccompProfile:
           type: RuntimeDefault

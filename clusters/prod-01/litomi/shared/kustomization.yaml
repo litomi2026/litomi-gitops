@@ -7,5 +7,6 @@ resources:
   - ../../../../apps/litomi/shared
   - configmap-litomi-common-env.yaml
   - configmap-litomi-public-env.yaml
+  - priorityclass-litomi-runtime.yaml
   - secretstore-vault.yaml
   - externalsecret-litomi-backend-secret.yaml

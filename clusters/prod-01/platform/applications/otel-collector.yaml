@@ -19,6 +19,9 @@ spec:
     - repoURL: https://github.com/litomi2026/litomi-gitops.git
       targetRevision: main
       ref: values
+    - repoURL: https://github.com/litomi2026/litomi-gitops.git
+      targetRevision: main
+      path: clusters/prod-01/ops/tracing
   destination:
     name: prod-01
     namespace: tracing

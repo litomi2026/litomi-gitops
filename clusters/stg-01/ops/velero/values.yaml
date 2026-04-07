@@ -30,12 +30,15 @@ nodeAgent:
       cpu: 100m
       memory: 128Mi
 
+metrics:
+  serviceMonitor:
+    enabled: false
+
 schedules:
   daily:
     template:
       ttl: "72h"
       includedNamespaces:
-        - monitoring
-        - logging
-        - tracing
         - litomi
+        - cloudflared
+        - gtm-server

@@ -5,3 +5,4 @@ resources:
   - ../../../../apps/platform/logging
   - secretstore-vault.yaml
   - externalsecret-loki-minio.yaml
+  - ingress-loki.yaml

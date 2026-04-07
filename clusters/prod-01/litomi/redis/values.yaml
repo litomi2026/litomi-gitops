@@ -1,71 +1,31 @@
-fullnameOverride: redis-ha
+fullnameOverride: redis
 
-architecture: replication
+architecture: standalone
 
 auth:
   enabled: true
-  sentinel: true
   existingSecret: litomi-backend-secret
   existingSecretPasswordKey: REDIS_PASSWORD
   usePasswordFiles: true
   usePasswordFileFromSecret: true
 
-sentinel:
-  enabled: true
-  quorum: 2
-  primarySet: litomi
-  service:
-    createPrimary: false
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
-
 primary:
-  podAntiAffinityPreset: hard
-  topologySpreadConstraints:
-    - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
-      labelSelector:
-        matchLabels:
-          app.kubernetes.io/name: valkey
-          app.kubernetes.io/instance: redis-ha
-  startupProbe:
-    enabled: true
-  persistence:
-    enabled: true
-    size: 8Gi
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-replica:
-  replicaCount: 2
-  podAntiAffinityPreset: hard
+  priorityClassName: litomi-runtime
   startupProbe:
     enabled: true
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
+      whenUnsatisfiable: ScheduleAnyway
       labelSelector:
         matchLabels:
           app.kubernetes.io/name: valkey
-          app.kubernetes.io/instance: redis-ha
+          app.kubernetes.io/instance: redis
   pdb:
-    create: true
-    minAvailable: 1
+    create: false
   persistence:
     enabled: true
-    size: 8Gi
+    size: 10Gi
   resources:
     requests:
       cpu: 100m
@@ -75,23 +35,7 @@ replica:
       memory: 512Mi
 
 metrics:
-  enabled: true
-  serviceMonitor:
-    enabled: true
-    namespace: monitoring
-    additionalLabels:
-      release: kube-prometheus-stack
-      app.kubernetes.io/instance: kube-prometheus-stack
-    additionalEndpoints:
-      - interval: 30s
-        path: /scrape
-        port: metrics
-        params:
-          target:
-            - localhost:26379
-        metricRelabelings:
-          - targetLabel: app
-            replacement: sentinel
+  enabled: false
 
 networkPolicy:
   enabled: false

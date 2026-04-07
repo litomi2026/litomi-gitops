@@ -10,6 +10,10 @@
 키 이름은 consumer가 기대하는 이름을 그대로 사용해요.
 인프라용 secret은 `snake_case`를 주로 쓰고, 앱 env secret은 `UPPER_SNAKE_CASE`를 그대로 써도 됩니다.
 
+`prod-01`, `stg-01`, `dev-01` 같은 runtime cluster 앱 secret은 runtime dependency 위치를 명확히 드러내야 해요.
+예를 들어 `REDIS_URL`은 각 cluster 안의 `redis:6379`를 가리키는 것을 기본으로 봐요.
+반대로 `DATABASE_URL`과 `DIRECT_URL`은 cluster 바깥의 external DB endpoint를 가리키도록 채워요.
+
 예:
 
 - `access_key`

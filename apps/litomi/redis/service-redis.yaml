@@ -5,9 +5,7 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/name: valkey
-    app.kubernetes.io/instance: redis-ha
-    app.kubernetes.io/component: node
-    isPrimary: "true"
+    app.kubernetes.io/instance: redis
   ports:
     - name: redis
       port: 6379

@@ -7,6 +7,7 @@ resources:
     memory: 128Mi
 
 serviceMonitor:
+  enabled: false
   interval: 60s
 
 config:
@@ -14,7 +15,7 @@ config:
     [OUTPUT]
         Name loki
         Match kube.*
-        Host loki.logging.svc
+        Host loki.mgmt.litomi.internal
         Port 3100
         Labels cluster=prod-01,job=fluent-bit
         Auto_Kubernetes_Labels On
