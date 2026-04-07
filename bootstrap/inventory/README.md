@@ -5,7 +5,7 @@
 각 inventory는 다음 용도로 같이 써요.
 
 - host/bootstrap 레이어: kube-vip API VIP, MetalLB pool, 노드 목록
-- GitOps bootstrap 레이어: kubeconfig path, cluster role, environment, size profile, addon label
+- GitOps bootstrap 레이어: kubeconfig path, cluster role, environment, size profile
 - Vault bootstrap 레이어: cluster별 Kubernetes auth mount 이름
 
 스크립트가 실제로 읽는 최소 필드는 아래예요.
@@ -14,7 +14,6 @@
 - `spec.role`
 - `spec.environment`
 - `spec.sizeProfile`
-- `spec.addons.publicEdge`
 - `spec.bootstrap.kubeconfig`
 - `spec.bootstrap.context`
 - `spec.vault.authMount`

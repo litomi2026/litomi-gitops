@@ -8,8 +8,6 @@ resources:
   - projects/platform-mgmt.yaml
   - projects/platform-workload.yaml
   - projects/litomi-workload.yaml
-  - projects/public-edge.yaml
   - appsets/platform-clusters.yaml
   - appsets/litomi-clusters.yaml
-  - appsets/public-edge-addons.yaml
   - applications/mgmt-01.yaml

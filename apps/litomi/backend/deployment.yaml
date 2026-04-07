@@ -45,9 +45,6 @@ spec:
             - configMapRef:
                 name: litomi-common-env
             - configMapRef:
-                name: litomi-public-edge-common-env
-                optional: true
-            - configMapRef:
                 name: litomi-backend-env
             - secretRef:
                 name: litomi-backend-secret

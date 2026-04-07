@@ -42,13 +42,7 @@ spec:
             - configMapRef:
                 name: litomi-public-env
             - configMapRef:
-                name: litomi-public-edge-public-env
-                optional: true
-            - configMapRef:
                 name: litomi-common-env
-            - configMapRef:
-                name: litomi-public-edge-common-env
-                optional: true
             - configMapRef:
                 name: litomi-web-env
             - secretRef:

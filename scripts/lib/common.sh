@@ -226,24 +226,6 @@ inventory_size_profile() {
   inventory_value "$1" '.spec.sizeProfile'
 }
 
-inventory_public_edge() {
-  local raw_value
-
-  raw_value="$(inventory_value "$1" '.spec.addons.publicEdge')"
-
-  case "${raw_value,,}" in
-    enabled|true|yes|1)
-      printf 'enabled'
-      ;;
-    disabled|false|no|0|"")
-      printf 'disabled'
-      ;;
-    *)
-      die "Unsupported publicEdge value in $(inventory_name "$1"): ${raw_value}"
-      ;;
-  esac
-}
-
 inventory_internal_domain() {
   inventory_value "$1" '.spec.network.internalDomain'
 }

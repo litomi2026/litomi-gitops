@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gtm-server-tagging
+spec:
+  template:
+    spec:
+      containers:
+        - name: tagging
+          env:
+            - name: PREVIEW_SERVER_URL
+              value: https://anal-preview-stg.litomi.in

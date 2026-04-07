@@ -1,3 +1,5 @@
+- Ubuntu 24.04 LTS
+
 ```
 apt-get install git
 ```

@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: litomi-public-edge-common-env
-data:
-  APP_ORIGIN: https://litomi.in

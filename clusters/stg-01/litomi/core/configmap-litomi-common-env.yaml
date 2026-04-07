@@ -4,7 +4,7 @@ metadata:
   name: litomi-common-env
 data:
   APP_ENV: stg
-  APP_ORIGIN: https://app.stg.litomi.internal
+  APP_ORIGIN: https://stg.litomi.in
   REDIS_URL: redis://redis:6379
   OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.tracing.svc:4318
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf

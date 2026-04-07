@@ -9,3 +9,4 @@ resources:
   - applications/backend.yaml
   - applications/web.yaml
   - applications/edge.yaml
+  - applications/public-edge.yaml

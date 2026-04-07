@@ -6,8 +6,6 @@ spec:
   role: workload
   environment: stg
   sizeProfile: small-ha
-  addons:
-    publicEdge: disabled
   network:
     internalDomain: stg.litomi.internal
     apiVip: 172.30.20.10

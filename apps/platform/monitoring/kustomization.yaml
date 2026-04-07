@@ -11,6 +11,9 @@ resources:
   - serviceaccount-eso-vault.yaml
   - alertmanagerconfig-discord.yaml
   - prometheusrule-observability-pipeline.yaml
+  - configmap-blackbox-exporter.yaml
+  - deployment-blackbox-exporter.yaml
+  - service-blackbox-exporter.yaml
 
 configMapGenerator:
   - name: vault-ca

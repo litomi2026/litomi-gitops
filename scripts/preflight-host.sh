@@ -98,19 +98,10 @@ cluster_inventories=("${management_inventory}" "${workload_inventories[@]}")
 
 for inventory_file in "${cluster_inventories[@]}"; do
   cluster_name="$(inventory_name "${inventory_file}")"
-  public_edge="$(inventory_public_edge "${inventory_file}")"
 
   while IFS= read -r template_file; do
     secure_file="${vault_secrets_dir}/${template_file#${templates_root}/}"
     secure_file="${secure_file%.template}"
-
-    case "${secure_file}" in
-      */cloudflared/*|*/gtm-server/*)
-        if [[ "${public_edge}" != "enabled" ]]; then
-          continue
-        fi
-        ;;
-    esac
 
     require_file "${secure_file}"
   done < <(find "${templates_root}/${cluster_name}" -type f -name '*.env.template' | sort)

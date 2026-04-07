@@ -17,7 +17,7 @@ Verifies the multi-cluster GitOps topology:
 - workload cluster registration labels and parent Applications
 - central Vault SecretStore wiring
 - central MinIO credential delivery for Loki/Tempo/Velero
-- internal ingress, PDBs, HPAs, and addon-disabled defaults
+- internal/public ingress, public exposure secrets, PDBs, and HPAs
 EOF
   usage_common_flags
   cat <<'EOF'
@@ -208,29 +208,36 @@ check_ready_condition "Management velero SecretStores" "velero" "secretstore" "$
 for workload_inventory in "${workload_inventories[@]}"; do
   cluster_name="$(inventory_name "${workload_inventory}")"
   environment_name="$(inventory_environment "${workload_inventory}")"
-  public_edge="$(inventory_public_edge "${workload_inventory}")"
   expected_app_host="app.${environment_name}.litomi.internal"
   expected_api_host="api.${environment_name}.litomi.internal"
+  case "${environment_name}" in
+    stg)
+      expected_public_app_host="stg.litomi.in"
+      expected_public_api_host="api-stg.litomi.in"
+      expected_public_image_host="img-stg.litomi.in"
+      expected_gtm_host="anal-stg.litomi.in"
+      expected_gtm_preview_host="anal-preview-stg.litomi.in"
+      ;;
+    prod)
+      expected_public_app_host="litomi.in"
+      expected_public_api_host="api.litomi.in"
+      expected_public_image_host="img.litomi.in"
+      expected_gtm_host="anal.litomi.in"
+      expected_gtm_preview_host="anal-preview.litomi.in"
+      ;;
+    *)
+      die "Unsupported workload environment for public exposure checks: ${environment_name}"
+      ;;
+  esac
 
   cluster_secret_json="$(kubectl "${management_kubectl_args[@]}" -n argocd get secret "${cluster_name}" -o json)"
   [[ "$(jq -r '.metadata.labels.role // ""' <<<"${cluster_secret_json}")" == "workload" ]] || die "Cluster secret ${cluster_name} is missing role=workload"
   [[ "$(jq -r '.metadata.labels.environment // ""' <<<"${cluster_secret_json}")" == "${environment_name}" ]] || die "Cluster secret ${cluster_name} has wrong environment label"
-  [[ "$(jq -r '.metadata.labels["litomi.io/addon-public-edge"] // ""' <<<"${cluster_secret_json}")" == "${public_edge}" ]] || die "Cluster secret ${cluster_name} has wrong public-edge label"
 
   for app_name in "platform-${cluster_name}" "litomi-${cluster_name}"; do
     app_json="$(kubectl "${management_kubectl_args[@]}" -n argocd get application "${app_name}" -o json)"
     log "${app_name}: sync=$(jq -r '.status.sync.status // "Unknown"' <<<"${app_json}") health=$(jq -r '.status.health.status // "Unknown"' <<<"${app_json}")"
   done
-
-  if [[ "${public_edge}" == "enabled" ]]; then
-    kubectl "${management_kubectl_args[@]}" -n argocd get application "public-edge-${cluster_name}" >/dev/null
-    log "public-edge-${cluster_name}: present"
-  else
-    if kubectl "${management_kubectl_args[@]}" -n argocd get application "public-edge-${cluster_name}" >/dev/null 2>&1; then
-      die "public-edge-${cluster_name} exists even though addon label is disabled"
-    fi
-    log "public-edge-${cluster_name}: correctly absent"
-  fi
 
   workload_kubeconfig="$(resolve_repo_path "$(inventory_kubeconfig "${workload_inventory}")")"
   workload_context="$(inventory_context "${workload_inventory}")"
@@ -253,8 +260,10 @@ for workload_inventory in "${workload_inventories[@]}"; do
   check_ready_pods "${cluster_name} tracing" "tracing" "" "${CURRENT_KUBECTL_ARGS[@]}" || true
   check_ready_pods "${cluster_name} velero" "velero" "" "${CURRENT_KUBECTL_ARGS[@]}" || true
   check_ready_pods "${cluster_name} litomi" "litomi" "" "${CURRENT_KUBECTL_ARGS[@]}" || true
+  check_ready_pods "${cluster_name} cloudflared" "cloudflared" "" "${CURRENT_KUBECTL_ARGS[@]}" || true
+  check_ready_pods "${cluster_name} gtm-server" "gtm-server" "" "${CURRENT_KUBECTL_ARGS[@]}" || true
 
-  for ns in monitoring logging tracing velero litomi; do
+  for ns in monitoring logging tracing velero litomi cloudflared gtm-server; do
     check_ready_condition "${cluster_name} SecretStores in ${ns}" "${ns}" "secretstore" "${CURRENT_KUBECTL_ARGS[@]}" || true
     assert_jsonpath_equals \
       "${cluster_name} ${ns} Vault endpoint" \
@@ -268,11 +277,8 @@ for workload_inventory in "${workload_inventories[@]}"; do
   require_secret_keys "tracing" "tempo-minio" "access_key" "secret_key" "bucket_traces"
   require_secret_keys "velero" "velero-cloud-credentials" "cloud"
   require_secret_keys "litomi" "litomi-backend-secret"
-
-  if [[ "${public_edge}" == "enabled" ]]; then
-    require_secret_keys "cloudflared" "cloudflared-token" "token"
-    require_secret_keys "gtm-server" "gtm-server-secret" "CONTAINER_CONFIG"
-  fi
+  require_secret_keys "cloudflared" "cloudflared-token" "token"
+  require_secret_keys "gtm-server" "gtm-server-secret" "CONTAINER_CONFIG"
 
   traefik_ip="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n traefik get svc traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
   [[ -n "${traefik_ip}" ]] || die "${cluster_name} traefik Service has no LoadBalancer IP"
@@ -282,6 +288,33 @@ for workload_inventory in "${workload_inventories[@]}"; do
   grep -qx "${expected_app_host}" <<<"${ingress_hosts}" || die "${cluster_name} internal ingress is missing ${expected_app_host}"
   grep -qx "${expected_api_host}" <<<"${ingress_hosts}" || die "${cluster_name} internal ingress is missing ${expected_api_host}"
   log "${cluster_name} internal ingress hosts look correct"
+
+  public_ingress_hosts="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get ingress litomi-public -o json | jq -r '.spec.rules[].host')"
+  grep -qx "${expected_public_app_host}" <<<"${public_ingress_hosts}" || die "${cluster_name} public ingress is missing ${expected_public_app_host}"
+  grep -qx "${expected_public_api_host}" <<<"${public_ingress_hosts}" || die "${cluster_name} public ingress is missing ${expected_public_api_host}"
+  grep -qx "${expected_public_image_host}" <<<"${public_ingress_hosts}" || die "${cluster_name} public ingress is missing ${expected_public_image_host}"
+  log "${cluster_name} public ingress hosts look correct"
+
+  gtm_ingress_hosts="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get ingress gtm-server -o json | jq -r '.spec.rules[].host')"
+  grep -qx "${expected_gtm_host}" <<<"${gtm_ingress_hosts}" || die "${cluster_name} GTM ingress is missing ${expected_gtm_host}"
+  grep -qx "${expected_gtm_preview_host}" <<<"${gtm_ingress_hosts}" || die "${cluster_name} GTM ingress is missing ${expected_gtm_preview_host}"
+  log "${cluster_name} GTM ingress hosts look correct"
+
+  assert_jsonpath_equals \
+    "${cluster_name} canonical APP_ORIGIN" \
+    "https://${expected_public_app_host}" \
+    '{.data.APP_ORIGIN}' \
+    kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get configmap litomi-common-env
+  assert_jsonpath_equals \
+    "${cluster_name} canonical NEXT_PUBLIC_API_ORIGIN" \
+    "https://${expected_public_api_host}" \
+    '{.data.NEXT_PUBLIC_API_ORIGIN}' \
+    kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get configmap litomi-public-env
+  assert_jsonpath_equals \
+    "${cluster_name} canonical NEXT_PUBLIC_IMAGE_PROXY_ORIGIN" \
+    "https://${expected_public_image_host}" \
+    '{.data.NEXT_PUBLIC_IMAGE_PROXY_ORIGIN}' \
+    kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get configmap litomi-public-env
 
   kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get pdb litomi-backend >/dev/null
   kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get pdb litomi-web >/dev/null

@@ -6,8 +6,6 @@ spec:
   role: management
   environment: mgmt
   sizeProfile: control-plane-ha
-  addons:
-    publicEdge: disabled
   network:
     internalDomain: mgmt.litomi.internal
     apiVip: 172.30.10.10

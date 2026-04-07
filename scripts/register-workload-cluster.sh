@@ -57,7 +57,6 @@ require_kubectl_connectivity "workload" "${workload_kubectl_args[@]}"
 cluster_name="$(inventory_name "${workload_inventory}")"
 environment_name="$(inventory_environment "${workload_inventory}")"
 size_profile="$(inventory_size_profile "${workload_inventory}")"
-public_edge="$(inventory_public_edge "${workload_inventory}")"
 
 cluster_config_json="$(kubectl "${workload_kubectl_args[@]}" config view --raw --flatten --minify -o json)"
 server="$(jq -r '.clusters[0].cluster.server' <<<"${cluster_config_json}")"
@@ -115,7 +114,6 @@ metadata:
     role: workload
     environment: ${environment_name}
     litomi.io/size-profile: ${size_profile}
-    litomi.io/addon-public-edge: ${public_edge}
     bootstrap.litomi.io/managed-by: register-workload-cluster
 type: Opaque
 stringData:
@@ -133,13 +131,6 @@ wait_for_jsonpath_value \
   "workload" \
   120 \
   '{.metadata.labels.role}' \
-  kubectl "${management_kubectl_args[@]}" -n argocd get secret "${cluster_name}"
-
-wait_for_jsonpath_value \
-  "cluster secret public-edge label for ${cluster_name}" \
-  "${public_edge}" \
-  120 \
-  '{.metadata.labels.litomi\.io/addon-public-edge}' \
   kubectl "${management_kubectl_args[@]}" -n argocd get secret "${cluster_name}"
 
 log "Cluster ${cluster_name} is registered for ApplicationSet discovery."

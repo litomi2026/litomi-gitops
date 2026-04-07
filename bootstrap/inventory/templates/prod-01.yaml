@@ -6,8 +6,6 @@ spec:
   role: workload
   environment: prod
   sizeProfile: production-ha
-  addons:
-    publicEdge: disabled
   network:
     internalDomain: prod.litomi.internal
     apiVip: 172.30.30.10
