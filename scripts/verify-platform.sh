@@ -17,7 +17,7 @@ Verifies the multi-cluster GitOps topology:
 - workload cluster registration labels and parent Applications
 - central Vault SecretStore wiring
 - central MinIO credential delivery for Loki/Tempo/Velero
-- internal/public ingress, public exposure secrets, PDBs, and HPAs
+- internal/public ingress, public exposure secrets, PDBs, HPAs, spread, and ingress NetworkPolicies
 EOF
   usage_common_flags
   cat <<'EOF'
@@ -318,7 +318,9 @@ for workload_inventory in "${workload_inventories[@]}"; do
 
   kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get pdb litomi-backend >/dev/null
   kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get pdb litomi-web >/dev/null
-  log "${cluster_name} PDBs exist for web/backend"
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n cloudflared get pdb cloudflared >/dev/null
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get pdb gtm-server-tagging >/dev/null
+  log "${cluster_name} PDBs exist for web/backend/cloudflared/gtm-server-tagging"
 
   backend_min_replicas="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get hpa litomi-backend -o jsonpath='{.spec.minReplicas}')"
   web_min_replicas="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get hpa litomi-web -o jsonpath='{.spec.minReplicas}')"
@@ -327,9 +329,36 @@ for workload_inventory in "${workload_inventories[@]}"; do
 
   backend_spread_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get deployment litomi-backend -o json | jq '.spec.template.spec.topologySpreadConstraints | length')"
   web_spread_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get deployment litomi-web -o json | jq '.spec.template.spec.topologySpreadConstraints | length')"
+  cloudflared_spread_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n cloudflared get deployment cloudflared -o json | jq '.spec.template.spec.topologySpreadConstraints | length')"
+  gtm_tagging_spread_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get deployment gtm-server-tagging -o json | jq '.spec.template.spec.topologySpreadConstraints | length')"
+  gtm_preview_spread_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get deployment gtm-server-preview -o json | jq '.spec.template.spec.topologySpreadConstraints | length')"
   [[ "${backend_spread_count}" -ge 1 ]] || die "${cluster_name} backend is missing topologySpreadConstraints"
   [[ "${web_spread_count}" -ge 1 ]] || die "${cluster_name} web is missing topologySpreadConstraints"
+  [[ "${cloudflared_spread_count}" -ge 1 ]] || die "${cluster_name} cloudflared is missing topologySpreadConstraints"
+  [[ "${gtm_tagging_spread_count}" -ge 1 ]] || die "${cluster_name} gtm-server-tagging is missing topologySpreadConstraints"
+  [[ "${gtm_preview_spread_count}" -ge 1 ]] || die "${cluster_name} gtm-server-preview is missing topologySpreadConstraints"
   log "${cluster_name} spread and HPA checks passed"
+
+  assert_jsonpath_equals \
+    "${cluster_name} gtm-server-preview replicas" \
+    "1" \
+    '{.spec.replicas}' \
+    kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get deployment gtm-server-preview
+
+  if kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get pdb gtm-server-preview >/dev/null 2>&1; then
+    die "${cluster_name} gtm-server-preview should not have a PodDisruptionBudget"
+  fi
+  if kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get hpa gtm-server-preview >/dev/null 2>&1; then
+    die "${cluster_name} gtm-server-preview should not have a HorizontalPodAutoscaler"
+  fi
+  log "${cluster_name} gtm-server-preview remains singleton without HPA/PDB"
+
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get networkpolicy litomi-web-ingress >/dev/null
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get networkpolicy litomi-backend-ingress >/dev/null
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get networkpolicy redis-ingress >/dev/null
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n cloudflared get networkpolicy cloudflared-metrics-ingress >/dev/null
+  kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n gtm-server get networkpolicy gtm-server-ingress >/dev/null
+  log "${cluster_name} ingress NetworkPolicies exist for litomi/cloudflared/gtm-server"
 
   kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get service redis >/dev/null
   redis_pod_count="$(kubectl "${CURRENT_KUBECTL_ARGS[@]}" -n litomi get pods -l app.kubernetes.io/instance=redis-ha -o json | jq '.items | length')"

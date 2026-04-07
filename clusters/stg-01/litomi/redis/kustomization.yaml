@@ -4,5 +4,4 @@ kind: Kustomization
 namespace: litomi
 
 resources:
-  - service-redis.yaml
-  - networkpolicy.yaml
+  - ../../../../apps/litomi/redis

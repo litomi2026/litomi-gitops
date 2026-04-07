@@ -13,9 +13,12 @@ spec:
       labels:
         app: litomi-backend
     spec:
-      terminationGracePeriodSeconds: 30
+      enableServiceLinks: false
       serviceAccountName: litomi-backend
       automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -35,7 +38,9 @@ spec:
       containers:
         - name: backend
           image: litomi-backend:prod
-          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3002
           env:
             - name: PORT
               value: '3002'
@@ -62,10 +67,17 @@ spec:
             - name: google-application-credentials
               mountPath: /etc/workload-identity
               readOnly: true
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            timeoutSeconds: 3
+            periodSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /ready
-              port: 3002
+              port: http
             initialDelaySeconds: 3
             periodSeconds: 10
             timeoutSeconds: 3
@@ -73,7 +85,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 3002
+              port: http
             initialDelaySeconds: 10
             timeoutSeconds: 3
             failureThreshold: 6
@@ -90,8 +102,6 @@ spec:
             capabilities:
               drop:
                 - ALL
-            seccompProfile:
-              type: RuntimeDefault
       volumes:
         - name: google-identity-token
           projected:

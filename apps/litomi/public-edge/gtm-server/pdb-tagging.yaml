@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gtm-server-tagging
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: gtm-server-tagging

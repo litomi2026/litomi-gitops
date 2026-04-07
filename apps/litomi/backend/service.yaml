@@ -6,4 +6,6 @@ spec:
   selector:
     app: litomi-backend
   ports:
-    - port: 3002
+    - name: http
+      port: 3002
+      targetPort: http

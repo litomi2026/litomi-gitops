@@ -13,6 +13,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - pdb.yaml
+  - networkpolicy-metrics-ingress.yaml
 
 configMapGenerator:
   - name: vault-ca

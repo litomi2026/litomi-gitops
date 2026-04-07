@@ -13,6 +13,8 @@ resources:
   - service-preview.yaml
   - deployment-tagging.yaml
   - service-tagging.yaml
+  - pdb-tagging.yaml
+  - networkpolicy-ingress.yaml
   - hpa-tagging.yaml
 
 configMapGenerator:

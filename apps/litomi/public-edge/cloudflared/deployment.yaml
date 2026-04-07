@@ -4,6 +4,7 @@ metadata:
   name: cloudflared
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: cloudflared
@@ -12,7 +13,12 @@ spec:
       labels:
         app: cloudflared
     spec:
+      enableServiceLinks: false
       serviceAccountName: cloudflared
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -22,9 +28,19 @@ spec:
                   matchLabels:
                     app: cloudflared
                 topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: cloudflared
       containers:
         - name: cloudflared
           image: cloudflare/cloudflared:2026.1.2
+          ports:
+            - name: metrics
+              containerPort: 2000
           args:
             - tunnel
             - --no-autoupdate
@@ -44,14 +60,14 @@ spec:
           startupProbe:
             httpGet:
               path: /ready
-              port: 2000
+              port: metrics
             timeoutSeconds: 2
             periodSeconds: 5
             failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /ready
-              port: 2000
+              port: metrics
             initialDelaySeconds: 3
             periodSeconds: 5
             timeoutSeconds: 2
@@ -59,7 +75,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /ready
-              port: 2000
+              port: metrics
             initialDelaySeconds: 10
             timeoutSeconds: 2
             failureThreshold: 1
@@ -76,5 +92,3 @@ spec:
               drop:
                 - ALL
             runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
