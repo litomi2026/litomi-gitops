@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: argocd
 
 resources:
-  - applications/core.yaml
+  - applications/shared.yaml
   - applications/redis.yaml
   - applications/backend.yaml
   - applications/web.yaml

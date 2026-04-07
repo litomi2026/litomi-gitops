@@ -276,7 +276,7 @@ for workload_inventory in "${workload_inventories[@]}"; do
   require_secret_keys "logging" "loki-minio" "access_key" "secret_key" "bucket_chunks" "bucket_ruler"
   require_secret_keys "tracing" "tempo-minio" "access_key" "secret_key" "bucket_traces"
   require_secret_keys "velero" "velero-cloud-credentials" "cloud"
-  require_secret_keys "litomi" "litomi-backend-secret"
+  require_secret_keys "litomi" "litomi-backend-secret" "REDIS_PASSWORD" "REDIS_URL"
   require_secret_keys "cloudflared" "cloudflared-token" "token"
   require_secret_keys "gtm-server" "gtm-server-secret" "CONTAINER_CONFIG"
 

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: stg-01-litomi-core
+  name: prod-01-litomi-shared
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: '0'
@@ -10,9 +10,9 @@ spec:
   source:
     repoURL: https://github.com/litomi2026/litomi-gitops.git
     targetRevision: main
-    path: clusters/stg-01/litomi/core
+    path: clusters/prod-01/litomi/shared
   destination:
-    name: stg-01
+    name: prod-01
     namespace: litomi
   syncPolicy:
     automated:

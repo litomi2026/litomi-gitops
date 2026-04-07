@@ -3,7 +3,12 @@ fullnameOverride: redis-ha
 architecture: replication
 
 auth:
-  enabled: false
+  enabled: true
+  sentinel: true
+  existingSecret: litomi-backend-secret
+  existingSecretPasswordKey: REDIS_PASSWORD
+  usePasswordFiles: true
+  usePasswordFileFromSecret: true
 
 sentinel:
   enabled: true
@@ -11,9 +16,26 @@ sentinel:
   primarySet: litomi
   service:
     createPrimary: false
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
 primary:
-  podAntiAffinityPreset: soft
+  podAntiAffinityPreset: hard
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: valkey
+          app.kubernetes.io/instance: redis-ha
+  startupProbe:
+    enabled: true
   persistence:
     enabled: true
     size: 4Gi
@@ -27,15 +49,20 @@ primary:
 
 replica:
   replicaCount: 2
-  podAntiAffinityPreset: soft
+  podAntiAffinityPreset: hard
+  startupProbe:
+    enabled: true
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: ScheduleAnyway
+      whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
           app.kubernetes.io/name: valkey
           app.kubernetes.io/instance: redis-ha
+  pdb:
+    create: true
+    minAvailable: 1
   persistence:
     enabled: true
     size: 4Gi
@@ -55,6 +82,16 @@ metrics:
     additionalLabels:
       release: kube-prometheus-stack
       app.kubernetes.io/instance: kube-prometheus-stack
+    additionalEndpoints:
+      - interval: 30s
+        path: /scrape
+        port: metrics
+        params:
+          target:
+            - localhost:26379
+        metricRelabelings:
+          - targetLabel: app
+            replacement: sentinel
 
 networkPolicy:
   enabled: false

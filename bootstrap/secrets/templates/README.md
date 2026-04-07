@@ -7,12 +7,15 @@
 - Vault KV path: `kv/clusters/<cluster>/<namespace>/<secret>`
 
 `scripts/seed-vault-kv.sh`는 shell-compatible `KEY=value` 파일을 읽어서 그대로 Vault KV에 넣어요.
-그래서 property 이름은 env 파일에서 안전한 `snake_case`를 사용해요.
+키 이름은 consumer가 기대하는 이름을 그대로 사용해요.
+인프라용 secret은 `snake_case`를 주로 쓰고, 앱 env secret은 `UPPER_SNAKE_CASE`를 그대로 써도 됩니다.
 
 예:
 
 - `access_key`
 - `secret_key`
+- `REDIS_PASSWORD`
+- `REDIS_URL`
 - `bucket_chunks`
 - `bucket_traces`
 - `root_user`

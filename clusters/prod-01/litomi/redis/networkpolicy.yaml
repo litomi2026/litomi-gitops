@@ -13,6 +13,16 @@ spec:
     - from:
         - podSelector:
             matchLabels:
+              app.kubernetes.io/name: valkey
+              app.kubernetes.io/instance: redis-ha
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 26379
+    - from:
+        - podSelector:
+            matchLabels:
               app: litomi-web
         - podSelector:
             matchLabels:
@@ -20,3 +30,10 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9121

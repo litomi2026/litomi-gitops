@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: litomi
 
 resources:
-  - ../../../../apps/litomi/core
+  - ../../../../apps/litomi/shared
   - configmap-litomi-common-env.yaml
   - configmap-litomi-public-env.yaml
   - secretstore-vault.yaml
