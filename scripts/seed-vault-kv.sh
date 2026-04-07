@@ -65,26 +65,29 @@ fi
 vault_addr="${VAULT_ADDR_OVERRIDE:-${vault_addr_default}}"
 vault_token_file="$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
 vault_secrets_dir="$(resolve_repo_path "${VAULT_SECRETS_DIR}")"
-templates_root="$(resolve_repo_path "bootstrap/secrets/templates/clusters")"
 kv_mount="kv"
 
 [[ -n "${vault_token_file}" ]] || die "--vault-token-file is required"
 require_file "${vault_token_file}"
 require_dir "${vault_secrets_dir}"
-require_dir "${templates_root}"
 
 export VAULT_ADDR="${vault_addr}"
 export VAULT_TOKEN
 VAULT_TOKEN="$(load_file_contents "${vault_token_file}")"
 
-while IFS= read -r template_file; do
-  secure_file="${vault_secrets_dir}/${template_file#${templates_root}/}"
-  secure_file="${secure_file%.template}"
+validate_args=(
+  --vault-secrets-dir "${vault_secrets_dir}"
+)
 
-  if [[ ! -f "${secure_file}" ]]; then
-    warn "Missing secure input for template: ${secure_file}"
-  fi
-done < <(find "${templates_root}" -type f -name '*.env.template' | sort)
+if [[ -n "${MANAGEMENT_INVENTORY_FILE}" ]]; then
+  validate_args+=(--management-inventory "${MANAGEMENT_INVENTORY_FILE}")
+fi
+
+for remote_inventory in "${REMOTE_INVENTORY_FILES[@]}"; do
+  validate_args+=(--remote-inventory "${remote_inventory}")
+done
+
+run "${SCRIPT_DIR}/validate-vault-secrets.sh" "${validate_args[@]}"
 
 seed_count=0
 

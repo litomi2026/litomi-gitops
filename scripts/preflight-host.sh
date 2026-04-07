@@ -104,20 +104,16 @@ if [[ -n "${VAULT_TOKEN_FILE}" ]]; then
   require_file "$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
 fi
 
-templates_root="$(resolve_repo_path "bootstrap/secrets/templates/clusters")"
-require_dir "${templates_root}"
+validate_args=(
+  --management-inventory "${management_inventory}"
+  --vault-secrets-dir "${vault_secrets_dir}"
+  --require-secure-files
+)
 
-cluster_inventories=("${management_inventory}" "${remote_inventories[@]}")
-
-for inventory_file in "${cluster_inventories[@]}"; do
-  cluster_name="$(inventory_name "${inventory_file}")"
-
-  while IFS= read -r template_file; do
-    secure_file="${vault_secrets_dir}/${template_file#${templates_root}/}"
-    secure_file="${secure_file%.template}"
-
-    require_file "${secure_file}"
-  done < <(find "${templates_root}/${cluster_name}" -type f -name '*.env.template' | sort)
+for remote_inventory in "${remote_inventories[@]}"; do
+  validate_args+=(--remote-inventory "${remote_inventory}")
 done
+
+run "${SCRIPT_DIR}/validate-vault-secrets.sh" "${validate_args[@]}"
 
 log "Tooling, inventories, kubeconfigs, and secure input files look ready."
