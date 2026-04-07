@@ -136,6 +136,34 @@ env_file_value() {
   die "Key '${expected_key}' not found in ${env_file}"
 }
 
+env_file_optional_value() {
+  local env_file="$1"
+  local expected_key="$2"
+  local line key raw_value
+
+  require_file "${env_file}"
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+ ]] && line="${line#export }"
+
+    if [[ ! "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      die "Unsupported env line in ${env_file}: ${line}"
+    fi
+
+    key="${line%%=*}"
+    raw_value="${line#*=}"
+
+    if [[ "${key}" == "${expected_key}" ]]; then
+      decode_env_value "${raw_value}"
+      return 0
+    fi
+  done <"${env_file}"
+
+  return 1
+}
+
 parse_common_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in

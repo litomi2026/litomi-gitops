@@ -202,6 +202,13 @@ verify_management_cluster() {
 
   repo_secret_json="$(kubectl "${management_kubectl_args[@]}" -n argocd get secret github-repo-creds -o json)"
   [[ "$(jq -r '.metadata.labels["argocd.argoproj.io/secret-type"] // ""' <<<"${repo_secret_json}")" == "repo-creds" ]] || die "github-repo-creds is missing repo-creds label"
+  [[ "$(jq -r '.data.githubAppID // empty' <<<"${repo_secret_json}")" != "" ]] || die "github-repo-creds is missing githubAppID"
+  [[ "$(jq -r '.data.githubAppInstallationID // empty' <<<"${repo_secret_json}")" != "" ]] || die "github-repo-creds is missing githubAppInstallationID"
+  [[ "$(jq -r '.data.githubAppPrivateKey // empty' <<<"${repo_secret_json}")" != "" ]] || die "github-repo-creds is missing githubAppPrivateKey"
+
+  if [[ "$(jq -r '.data.username // empty' <<<"${repo_secret_json}")" != "" ]] || [[ "$(jq -r '.data.password // empty' <<<"${repo_secret_json}")" != "" ]]; then
+    warn "github-repo-creds still exposes username/password fields; expected GitHub App credentials only"
+  fi
 
   owner_kind="$(jq -r '.metadata.ownerReferences[0].kind // empty' <<<"${repo_secret_json}")"
   if [[ "${owner_kind}" == "ExternalSecret" ]]; then

@@ -88,6 +88,18 @@ repo_creds_file="${REPO_CREDS_FILE:-${vault_secrets_dir}/clusters/${management_c
 repo_creds_file="$(resolve_repo_path "${repo_creds_file}")"
 require_file "${repo_creds_file}"
 
+repo_creds_url="$(env_file_value "${repo_creds_file}" "url")"
+repo_creds_type="$(env_file_value "${repo_creds_file}" "type")"
+repo_creds_github_app_id="$(env_file_value "${repo_creds_file}" "githubAppID")"
+repo_creds_github_app_installation_id="$(env_file_value "${repo_creds_file}" "githubAppInstallationID")"
+repo_creds_github_app_private_key="$(env_file_value "${repo_creds_file}" "githubAppPrivateKey")"
+
+[[ -n "${repo_creds_url}" ]] || die "Repository credential file is missing a non-empty url: ${repo_creds_file}"
+[[ "${repo_creds_type}" == "git" ]] || die "Repository credential file must set type=git: ${repo_creds_file}"
+[[ -n "${repo_creds_github_app_id}" ]] || die "Repository credential file is missing githubAppID: ${repo_creds_file}"
+[[ -n "${repo_creds_github_app_installation_id}" ]] || die "Repository credential file is missing githubAppInstallationID: ${repo_creds_file}"
+[[ -n "${repo_creds_github_app_private_key}" ]] || die "Repository credential file is missing githubAppPrivateKey: ${repo_creds_file}"
+
 if [[ -n "${VAULT_TOKEN_FILE}" ]]; then
   require_file "$(resolve_repo_path "${VAULT_TOKEN_FILE}")"
 fi

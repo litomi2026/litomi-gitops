@@ -26,3 +26,16 @@
 - `root_password`
 
 멀티라인 값은 `$'...\n...'` 형태로 넣으면 그대로 복원돼요.
+
+Argo CD가 private GitHub repo를 GitHub App으로 읽을 때는
+`clusters/<cluster>/argocd/github-repo-creds.env`에 아래 키를 넣어요.
+
+```dotenv
+url=https://github.com/litomi2026/litomi-gitops.git
+type=git
+githubAppID=123456
+githubAppInstallationID=78901234
+githubAppPrivateKey=$'-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n'
+# Optional for GitHub Enterprise Server:
+# githubAppEnterpriseBaseUrl=https://ghe.example.com/api/v3
+```

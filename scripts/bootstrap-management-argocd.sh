@@ -61,8 +61,16 @@ require_file "${repo_creds_file}"
 
 bootstrap_repo_url="$(env_file_value "${repo_creds_file}" "url")"
 bootstrap_repo_type="$(env_file_value "${repo_creds_file}" "type")"
-bootstrap_repo_username="$(env_file_value "${repo_creds_file}" "username")"
-bootstrap_repo_password="$(env_file_value "${repo_creds_file}" "password")"
+bootstrap_repo_github_app_id="$(env_file_value "${repo_creds_file}" "githubAppID")"
+bootstrap_repo_github_app_installation_id="$(env_file_value "${repo_creds_file}" "githubAppInstallationID")"
+bootstrap_repo_github_app_private_key="$(env_file_value "${repo_creds_file}" "githubAppPrivateKey")"
+bootstrap_repo_github_app_enterprise_base_url="$(env_file_optional_value "${repo_creds_file}" "githubAppEnterpriseBaseUrl" || true)"
+
+[[ -n "${bootstrap_repo_url}" ]] || die "Repository credential file is missing a non-empty url: ${repo_creds_file}"
+[[ "${bootstrap_repo_type}" == "git" ]] || die "Repository credential file must set type=git: ${repo_creds_file}"
+[[ -n "${bootstrap_repo_github_app_id}" ]] || die "Repository credential file is missing githubAppID: ${repo_creds_file}"
+[[ -n "${bootstrap_repo_github_app_installation_id}" ]] || die "Repository credential file is missing githubAppInstallationID: ${repo_creds_file}"
+[[ -n "${bootstrap_repo_github_app_private_key}" ]] || die "Repository credential file is missing githubAppPrivateKey: ${repo_creds_file}"
 
 log "Applying Argo CD bootstrap manifests on $(inventory_name "${management_inventory}")"
 kubectl_apply_kustomize "${argocd_bootstrap_kustomize}" "${management_kubectl_args[@]}"
@@ -79,6 +87,11 @@ done
 tmp_manifest="$(mktemp)"
 trap 'rm -f "${tmp_manifest}"' EXIT
 
+github_app_enterprise_base_url_block=""
+if [[ -n "${bootstrap_repo_github_app_enterprise_base_url}" ]]; then
+  github_app_enterprise_base_url_block="  githubAppEnterpriseBaseUrl: \"${bootstrap_repo_github_app_enterprise_base_url}\""
+fi
+
 cat >"${tmp_manifest}" <<EOF
 apiVersion: v1
 kind: Secret
@@ -90,10 +103,13 @@ metadata:
     bootstrap.litomi.io/managed-by: bootstrap-management-argocd
 type: Opaque
 stringData:
-  url: ${bootstrap_repo_url}
-  type: ${bootstrap_repo_type}
-  username: ${bootstrap_repo_username}
-  password: ${bootstrap_repo_password}
+  url: "${bootstrap_repo_url}"
+  type: "${bootstrap_repo_type}"
+  githubAppID: "${bootstrap_repo_github_app_id}"
+  githubAppInstallationID: "${bootstrap_repo_github_app_installation_id}"
+${github_app_enterprise_base_url_block}
+  githubAppPrivateKey: |
+$(printf '%s\n' "${bootstrap_repo_github_app_private_key}" | sed 's/^/    /')
 EOF
 
 log "Creating temporary bootstrap repo credentials"

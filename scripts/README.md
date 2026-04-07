@@ -16,6 +16,20 @@
 inventory 템플릿은 `bootstrap/inventory/templates/*.yaml`을 기준으로 만들고,
 secret 입력 템플릿은 `bootstrap/secrets/templates/**`를 기준으로 채워요.
 
+management cluster의 Argo CD repo credential 파일은
+`/secure/vault-secrets/clusters/mgmt-01/argocd/github-repo-creds.env` 경로를 기본으로 보고,
+GitHub App 기준으로 아래 키를 기대해요.
+
+```dotenv
+url=https://github.com/litomi2026/litomi-gitops.git
+type=git
+githubAppID=123456
+githubAppInstallationID=78901234
+githubAppPrivateKey=$'-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n'
+```
+
+GitHub Enterprise Server면 `githubAppEnterpriseBaseUrl=https://<ghe-host>/api/v3`를 추가할 수 있어요.
+
 ## 권장 순서
 
 ```zsh
