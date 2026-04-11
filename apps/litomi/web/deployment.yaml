@@ -66,29 +66,26 @@ spec:
               port: http
             timeoutSeconds: 3
             periodSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /api/health
               port: http
-            initialDelaySeconds: 3
             periodSeconds: 5
             timeoutSeconds: 3
-            failureThreshold: 12
+            failureThreshold: 2
           livenessProbe:
             httpGet:
               path: /api/health
               port: http
-            initialDelaySeconds: 10
             timeoutSeconds: 3
-            failureThreshold: 6
           resources:
             requests:
               cpu: 200m
-              memory: 896Mi
+              memory: 832Mi
             limits:
               cpu: 1000m
-              memory: 1280Mi
+              memory: 1152Mi
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

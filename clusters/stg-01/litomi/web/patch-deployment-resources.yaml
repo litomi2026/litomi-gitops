@@ -9,8 +9,8 @@ spec:
         - name: web
           resources:
             requests:
-              cpu: 100m
-              memory: 512Mi
+              cpu: 40m
+              memory: 384Mi
             limits:
-              cpu: 1000m
-              memory: 1280Mi
+              cpu: 120m
+              memory: 512Mi

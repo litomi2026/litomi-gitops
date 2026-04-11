@@ -53,20 +53,20 @@ metrics:
 
 resources:
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 10m
+    memory: 128Mi
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 50m
+    memory: 192Mi
 
 nodeAgent:
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 5m
+      memory: 48Mi
     limits:
-      cpu: 500m
-      memory: 256Mi
+      cpu: 50m
+      memory: 80Mi
 
 schedules:
   daily:

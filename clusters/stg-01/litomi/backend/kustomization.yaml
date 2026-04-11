@@ -14,4 +14,4 @@ patches:
 images:
   - name: litomi-backend
     newName: ghcr.io/litomi2026/litomi-backend
-    digest: sha256:545a14319682209919b0bf837fa573a3581dba68e2ead53cdfdf1976d09cc898
+    digest: sha256:5fd70a772f12adf655b1192354c0ff727474458f024f483bd72c29d7b6130097

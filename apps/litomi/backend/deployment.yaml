@@ -70,32 +70,29 @@ spec:
               readOnly: true
           startupProbe:
             httpGet:
-              path: /ready
+              path: /startup
               port: http
             timeoutSeconds: 3
             periodSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /ready
               port: http
-            initialDelaySeconds: 3
-            periodSeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 3
-            failureThreshold: 6
+            failureThreshold: 1
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
             timeoutSeconds: 3
-            failureThreshold: 6
           resources:
             requests:
-              cpu: 100m
+              cpu: 80m
               memory: 640Mi
             limits:
-              cpu: 500m
+              cpu: 400m
               memory: 896Mi
           securityContext:
             allowPrivilegeEscalation: false
